@@ -22,7 +22,9 @@ shinyUI(fluidPage(
   h5("Sharma K, Schmitt S, Bergner CG, et al."),
   h5("Cell type- and brain region-resolved mouse brain proteome. "),
   h5("Nat Neurosci. 2015;18(12):1819-31."),
-  a("doi:10.1038/nn.4160", href = "http://www.nature.com/neuro/journal/v18/n12/abs/nn.4160.html")
-  a("Source Code", href = "http://www.nature.com/neuro/journal/v18/n12/abs/nn.4160.html")
+  a("doi:10.1038/nn.4160", href = "http://www.nature.com/neuro/journal/v18/n12/abs/nn.4160.html"),
+  h5("####"),
+  h5("Find info about this project online:"),
+  a("GitHub", href = "https://github.com/andymckenzie/brain_gene_expression")
 
 ))
