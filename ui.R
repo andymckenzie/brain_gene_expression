@@ -10,9 +10,10 @@ shinyUI(fluidPage(
       selectInput("data_type", h3("Data Source:"),
             c("Sharma et al. RNA Mouse (RPKM)" = "Sharma_RNA",
               "Sharma et al. Proteomics Mouse (LFQ)" = "Sharma_Proteomics",
-              "Darmanis et al. Single Cell RNA Human Cortex (Norm. Counts)" = "Darmanis_RNA",
-              "Tasic et al. Single Cell RNA V1 (Norm. RPKM)" = "Tasic_RNA",
-              "Marques et al. Single Cell Oligodendrocyte RNA Mouse (Norm. Counts)" = "Marques_RNA")),
+              "Darmanis et al. Single Cell RNA Human Cortex (Norm. CPM)" = "Darmanis_RNA",
+              "Tasic et al. Single Cell RNA V1 Mouse (Norm. CPM)" = "Tasic_RNA",
+              "Zeisel et al. Single Cell RNA Mouse (Norm. CPM)" = "Zeisel_RNA",
+              "Marques et al. Single Cell Oligodendrocyte RNA Mouse (Norm. CPM)" = "Marques_RNA")),
       checkboxInput(inputId = "log", label = "Log2 transform?", value = FALSE)
     ),
 
@@ -33,10 +34,15 @@ shinyUI(fluidPage(
   br(),
   a("Tasic B, et al. Nat Neurosci 2016; doi:10.1038/nn.4216",
     href = "http://www.nature.com/neuro/journal/v19/n2/full/nn.4216.html"),
+  br(),
+  a("Zeisel A, et al. Science 2015; doi:10.1126/science.aaa1934",
+    href = "http://science.sciencemag.org/content/347/6226/1138.full"),
   h5("Notes:"),
   div("- Error bars represent the standard error of the mean."),
-  div("- Data is averaged across regions when available."),
-  h5("Source code is available:"),
+  div("- Certain sub-cell types are averaged for visualization in Zeisel et al."),
+  div("- At least 15 samples per cell type were required for the single cell RNA-seq data."),
+  div("- Data is averaged across regions for some cell types in Marques et al. and Zeisel et al."),
+  h5("All source code is available:"),
   a("GitHub", href = "https://github.com/andymckenzie/brain_gene_expression")
 
 ))

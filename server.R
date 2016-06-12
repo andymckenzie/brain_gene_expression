@@ -113,7 +113,7 @@ shinyServer(function(input, output) {
       limits = aes(ymax = mean + se, ymin = mean - se)
       tmp_plot = ggplot(data = tmp_df, aes(x = types, y = mean)) + geom_point() +
         geom_errorbar(limits, width = 0.2) + theme_bw() +
-        ylab("TMM Normalized RNA Counts") + xlab("") +
+        ylab("TMM-Normalized RNA CPM") + xlab("") +
         theme(axis.text.x = element_text(angle = 60, hjust = 1),
           text = element_text(size = 22))
       print(tmp_plot)
@@ -156,7 +156,7 @@ shinyServer(function(input, output) {
       limits = aes(ymax = mean + se, ymin = mean - se)
       tmp_plot = ggplot(data = tmp_df, aes(x = types, y = mean)) + geom_point() +
         geom_errorbar(limits, width = 0.2) + theme_bw() +
-        ylab("TMM Normalized RNA Counts") + xlab("") +
+        ylab("TMM-Normalized RNA CPM") + xlab("") +
         theme(axis.text.x = element_text(angle = 60, hjust = 1),
           text = element_text(size = 22))
       print(tmp_plot)
@@ -169,12 +169,12 @@ shinyServer(function(input, output) {
 
   if(input$data_type == "Tasic_RNA"){
 
-    get_marques_plot <- function(gene){
+    get_tasic_plot <- function(gene){
 
       if(!gene %in% rownames(tasic)){
         gene = cap_first(gene)
         if(!gene %in% rownames(tasic)){
-          stop("Even when uncapitalized, that gene symbol is not in the Marques et al. data set.")
+          stop("Even when uncapitalized, that gene symbol is not in the Tasic et al. data set.")
         }
       }
       gene_data = tasic[gene, ]
@@ -196,13 +196,56 @@ shinyServer(function(input, output) {
       limits = aes(ymax = mean + se, ymin = mean - se)
       tmp_plot = ggplot(data = tmp_df, aes(x = types, y = mean)) + geom_point() +
         geom_errorbar(limits, width = 0.2) + theme_bw() +
-        ylab("Normalized RNA RPKM") + xlab("") +
+        ylab("TMM-Normalized RNA CPM") + xlab("") +
         theme(axis.text.x = element_text(angle = 60, hjust = 1),
           text = element_text(size = 22))
       print(tmp_plot)
 
+    }
 
+    get_tasic_plot(input$gene)
 
+  }
+
+  if(input$data_type == "Zeisel_RNA"){
+
+    get_zeisel_plot <- function(gene){
+
+      if(!gene %in% rownames(zeisel)){
+        gene = cap_first(gene)
+        if(!gene %in% rownames(zeisel)){
+          stop("Even when uncapitalized, that gene symbol is not in the Zeisel et al. data set.")
+        }
+      }
+      gene_data = zeisel[gene, ]
+      if(input$log){
+        types = colnames(zeisel)[grepl("log", colnames(zeisel))]
+        tmp = gene_data[ , types]
+        mean = tmp[ , grepl("mean", colnames(tmp))]
+        se = tmp[ , grepl("se", colnames(tmp))]
+      } else {
+        types = colnames(zeisel)[!grepl("log", colnames(zeisel))]
+        tmp = gene_data[ , types]
+        mean = tmp[ , grepl("mean", colnames(tmp))]
+        se = tmp[ , grepl("se", colnames(tmp))]
+      }
+      types_clean = types[grepl("mean", types)]
+      types_clean = sapply(strsplit(types_clean, "_", fixed = TRUE), "[", 1)
+      tmp_df = data.frame(mean = as.numeric(mean), se = as.numeric(se), types = types_clean)
+      tmp_df$types = factor(tmp_df$types, levels = unique(tmp_df$types))
+      limits = aes(ymax = mean + se, ymin = mean - se)
+      tmp_plot = ggplot(data = tmp_df, aes(x = types, y = mean)) + geom_point() +
+        geom_errorbar(limits, width = 0.2) + theme_bw() +
+        ylab("TMM-Normalized RNA CPM") + xlab("") +
+        theme(axis.text.x = element_text(angle = 60, hjust = 1),
+          text = element_text(size = 22))
+      print(tmp_plot)
+
+    }
+
+    get_zeisel_plot(input$gene)
+
+  }
 
   })
 
