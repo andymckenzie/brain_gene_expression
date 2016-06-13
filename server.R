@@ -12,6 +12,7 @@ shinyServer(function(input, output) {
   if(input$data_type == "Sharma_RNA"){
 
     get_sharma_rpkm_plot <- function(gene){
+      gene = trimws(gene)
       if(!gene %in% rownames(sharma_rpkm)){
         gene = cap_first(gene)
         if(!gene %in% rownames(sharma_rpkm)){
@@ -49,6 +50,7 @@ shinyServer(function(input, output) {
   if(input$data_type == "Sharma_Proteomics"){
 
     get_sharma_lfq_plot <- function(gene){
+      gene = trimws(gene)
       if(!gene %in% rownames(sharma_lfq)){
         gene = cap_first(gene)
         if(!gene %in% rownames(sharma_lfq)){
@@ -87,7 +89,7 @@ shinyServer(function(input, output) {
   if(input$data_type == "Darmanis_RNA"){
 
     get_darmanis_plot <- function(gene){
-
+      gene = trimws(gene)
       if(!gene %in% rownames(darmanis)){
         gene = toupper(gene)
         if(!gene %in% rownames(darmanis)){
@@ -127,7 +129,7 @@ shinyServer(function(input, output) {
   if(input$data_type == "Marques_RNA"){
 
     get_marques_plot <- function(gene){
-
+      gene = trimws(gene)
       if(!gene %in% rownames(marques)){
         gene = cap_first(gene)
         if(!gene %in% rownames(marques)){
@@ -170,7 +172,7 @@ shinyServer(function(input, output) {
   if(input$data_type == "Tasic_RNA"){
 
     get_tasic_plot <- function(gene){
-
+      gene = trimws(gene)
       if(!gene %in% rownames(tasic)){
         gene = cap_first(gene)
         if(!gene %in% rownames(tasic)){
@@ -210,7 +212,7 @@ shinyServer(function(input, output) {
   if(input$data_type == "Zeisel_RNA"){
 
     get_zeisel_plot <- function(gene){
-
+      gene = trimws(gene)
       if(!gene %in% rownames(zeisel)){
         gene = cap_first(gene)
         if(!gene %in% rownames(zeisel)){

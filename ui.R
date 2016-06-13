@@ -42,6 +42,7 @@ shinyUI(fluidPage(
   div("- Certain sub-cell types are averaged for visualization in Zeisel et al."),
   div("- At least 15 samples per cell type were required for the single cell RNA-seq data."),
   div("- Data is averaged across regions for some cell types in Marques et al. and Zeisel et al."),
+  div("- We attempt to convert human to mouse gene symbols (and vv.) through capitilization."),
   h5("All source code is available:"),
   a("GitHub", href = "https://github.com/andymckenzie/brain_gene_expression")
 

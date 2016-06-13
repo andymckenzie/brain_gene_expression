@@ -44,7 +44,7 @@ saveRDS(sharma_prot_num, "data/sharma_lfq.rds")
 ###################################
 # darmanis
 
-filenames = list.files("/Users/amckenz/Dropbox/zhang/general_data/darmanis/GSE67835_RAW",
+filenames = list.files("data/GSE67835_RAW",
   pattern = "*.csv.gz", full.names = TRUE)
 
 #may get Error: OutOfMemoryError (Java): Java heap space due to XLConnect here
@@ -53,7 +53,7 @@ ldf = lapply(filenames, read.delim, header = FALSE)
 dar_merged = Reduce(function(...) merge(..., by = "V1", all = TRUE),
 	ldf)
 
-sample_names = list.files("/Users/amckenz/Dropbox/zhang/general_data/darmanis/GSE67835_RAW", pattern="*.csv.gz")
+sample_names = list.files("data/GSE67835_RAW", pattern="*.csv.gz")
 sample_names = sapply(strsplit(sample_names, "_"), "[[", 1)
 
 rownames(dar_merged) = dar_merged[ , 1]
@@ -62,8 +62,8 @@ colnames(dar_merged) = sample_names
 rownames(dar_merged) = gsub(" ", "", rownames(dar_merged))
 dar_norm = cpm_tmm(dar_merged)
 
-samples = read.delim("/Users/amckenz/Dropbox/zhang/general_data/darmanis/GSE67835-GPL18573_series_matrix.txt", fill = TRUE, skip = 38, quote = "", header = T)
-samples2 = read.delim("/Users/amckenz/Dropbox/zhang/general_data/darmanis/GSE67835-GPL15520_series_matrix.txt", fill = TRUE, skip = 38, quote = "", header = T)
+samples = read.delim("data/GSE67835-GPL18573_series_matrix.txt", fill = TRUE, skip = 38, quote = "", header = T)
+samples2 = read.delim("data/GSE67835-GPL15520_series_matrix.txt", fill = TRUE, skip = 38, quote = "", header = T)
 samples_full = cbind(samples, samples2)
 
 #find the GSM's that correspond to each of the cell types
@@ -218,6 +218,11 @@ for(i in 1:length(cell_types)){
   }
   print(i)
 }
+
+colnames(tasic_total_df)[grepl("Sst", colnames(tasic_total_df))] =
+  c("Sst Cbln4_mean", "Sst Cbln4_se", "Sst Cbln4_mean_log", "Sst Cbln4_se_log",
+  "Sst Chodl_mean", "Sst Chodl_se", "Sst Chodl_mean_log", "Sst Chodl_se_log",
+  "Sst Nr2f2_mean", "Sst Nr2f2_se", "Sst Nr2f2_mean_log", "Sst Nr2f2_se_log")
 
 rownames(tasic_total_df) = rownames(tasic_norm)
 saveRDS(tasic_total_df, "data/tasic.rds")
