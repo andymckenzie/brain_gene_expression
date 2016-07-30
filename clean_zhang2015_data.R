@@ -7,16 +7,6 @@ setwd("/Users/amckenz/Documents/github/brain_gene_expression/")
 cutoff_thresh = 0.5
 
 ############################
-# functions
-
-#https://www.biostars.org/p/72846/
-cpm_tmm <- function(counts){
-    d = DGEList(counts = counts)
-    d = calcNormFactors(d, method = "TMM")
-    return(cpm(d, normalized.lib.sizes = TRUE))
-}
-
-############################
 # zhang 2015 mouse data
 
 #downloaded the "supplementary excel files" for each sample from

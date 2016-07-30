@@ -78,6 +78,10 @@ dfxp_function <- function(cell_type, list_other_cells){
 	cutoff = as.numeric(quantile(expr_average, cutoff_thresh_percentile, names = FALSE))
 	zeis_trimmed = norm_zeis_log[(expr_average > cutoff), ]
 
+  #The voom transformation
+# is applied to the read counts. This converts the counts to log-counts per million with associated
+# precision weights. After this, the RNA-seq data can be analyzed as if it was microarray data
+
   celltypes_contrast = cell_types_main
   celltypes_contrast = gsub(cell_type, "MAIN", celltypes_contrast)
   for(i in 1:length(list_other_cells)){
