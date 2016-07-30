@@ -2,6 +2,10 @@ library(XLConnect)
 library(limma)
 library(DGCA)
 
+setwd("/Users/amckenz/Documents/github/brain_gene_expression/")
+
+cutoff_thresh = 0.5
+
 ############################
 # functions
 
@@ -15,13 +19,9 @@ cpm_tmm <- function(counts){
 ############################
 # zhang 2015 mouse data
 
-cutoff_thresh = 0.3
-
-setwd("/Users/amckenz/Dropbox/zhang/general_data/zhang_2014_mouse_celltype/")
-
 #downloaded the "supplementary excel files" for each sample from
 #http://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE52564
-filenames = list.files("GSE52564_RAW", pattern="*.xls", full.names=TRUE)
+filenames = list.files("data/GSE52564_RAW", pattern="*.xls", full.names=TRUE)
 #may get Error: OutOfMemoryError (Java): Java heap space due to XLConnect here
 ldf = lapply(filenames, readWorksheetFromFile, sheet = 1)
 barres_merged = Reduce(function(...) merge(..., by = "gene.symbol", all = T),
@@ -67,7 +67,7 @@ dfxp_function <- function(cell_type, list_other_cells){
 	fit2 = contrasts.fit(fit, contrast_matrix)
 	fit2 = eBayes(fit2, 0.01, trend = TRUE)
   print(head(fit2$coefficients))
-	tT = topTable(fit2, adjust = "BH", sort.by="B", number = nrow(fit2), coef = 1)
+	tT = topTable(fit2, adjust = "BH", sort.by="B", number = nrow(fit2), coef = 1, confint = TRUE)
 
   #calculate the average vs all of the other cell types
 	for(i in 1:length(list_other_cells)){
@@ -92,16 +92,17 @@ dfxp_function <- function(cell_type, list_other_cells){
 
 }
 
+
 z15_oli_df = dfxp_function("Mol", list("Neu", "Ast", "Mic", "Endo"))
-z15_neu_df = dfxp_function("Neu", list("Mol", "Ast", "Mic", "Endo"))
-z15_ast_df = dfxp_function("Ast", list("Neu", "Mol", "Mic", "Endo"))
-z15_mic_df = dfxp_function("Mic", list("Neu", "Ast", "Mol", "Endo"))
-z15_end_df = dfxp_function("Endo", list("Neu", "Ast", "Mic", "Mol"))
+z15_neu_df = dfxp_function("Neu", list("Mol", "Ast", "Mic", "Endo", "Opc"))
+z15_ast_df = dfxp_function("Ast", list("Neu", "Mol", "Mic", "Endo", "Opc"))
+z15_mic_df = dfxp_function("Mic", list("Neu", "Ast", "Mol", "Endo", "Opc"))
+z15_end_df = dfxp_function("Endo", list("Neu", "Ast", "Mic", "Mol", "Opc"))
+z15_opc_df = dfxp_function("Opc", list("Neu", "Ast", "Mic", "Endo"))
 
-saveRDS(z15_end_df, "data_dfxp/")
-
-plot(z15_oli_df$mean_fc, -log(z15_oli_df$P.Value, 10))
-plot(z15_neu_df$mean_fc, -log(z15_neu_df$P.Value, 10))
-plot(z15_ast_df$mean_fc, -log(z15_ast_df$P.Value, 10))
-plot(z15_mic_df$mean_fc, -log(z15_mic_df$P.Value, 10))
-plot(z15_end_df$mean_fc, -log(z15_end_df$P.Value, 10))
+saveRDS(z15_oli_df, "data/dfxp/z15_oli_df_dfxp.rds")
+saveRDS(z15_neu_df, "data/dfxp/z15_neu_df_dfxp.rds")
+saveRDS(z15_ast_df, "data/dfxp/z15_ast_df_dfxp.rds")
+saveRDS(z15_mic_df, "data/dfxp/z15_mic_df_dfxp.rds")
+saveRDS(z15_end_df, "data/dfxp/z15_end_df_dfxp.rds")
+saveRDS(z15_opc_df, "data/dfxp/z15_opc_df_dfxp.rds")

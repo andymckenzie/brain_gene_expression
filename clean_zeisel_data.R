@@ -37,10 +37,24 @@ cell_types = gsub("Pvm1", "Perivascular macrophage", cell_types)
 cell_types = gsub("Pvm2", "Perivascular macrophage", cell_types)
 cell_types = gsub("Mgl1", "Microglia", cell_types)
 cell_types = gsub("Mgl2", "Microglia", cell_types)
-cell_types = gsub("Mgl2", "Microglia", cell_types)
-cell_types = gsub("Mgl2", "Microglia", cell_types)
 cell_types[grepl("Int", cell_types)] = "Interneuron"
-cell_types[grepl("Oligo", cell_types)] = "Oligodendrocyte"
+#likely representing stages of maturation:
+# immature (Oligo4), pre-myelinating (Oligo2), myelinating
+# (Oligo5) and terminally differentiated post-myelination
+# (Oligo6) oligodendrocytes. An intermediate population, Oligo3,
+# was almost exclusively observed in somatosensory cortex
+# and may represent a distinct cellular state specific for
+# this tissue. The subclass Oligo1, which did not express the
+# prototypical genes associated with oligodendrocyte precursor
+# cells (OPCs), may represent a postmitotic cellular state,
+# associated with the first steps of oligodendrocyte differentiation.
+# Together, the Oligo1 – Oligo6
+# populations may represent sequential steps in the process
+# of maturation from an OPC to a terminally
+# differentiated oligodendrocyte.
+cell_types = gsub("Oligo4", "OPC", cell_types)
+cell_types = gsub("Oligo5", "Oligodendrocyte", cell_types)
+cell_types = gsub("Oligo6", "Oligodendrocyte", cell_types)
 cell_types = gsub("Vsmc", "Vascular Smooth Muscle", cell_types)
 cell_types = gsub("Peric", "Pericyte", cell_types)
 cell_types = gsub("Epend", "Ependymal", cell_types)
@@ -76,7 +90,7 @@ dfxp_function <- function(cell_type, list_other_cells){
 	fit2 = contrasts.fit(fit, contrast_matrix)
 	fit2 = eBayes(fit2, 0.01, trend = TRUE)
   print(head(fit2$coefficients))
-	tT = topTable(fit2, adjust = "BH", sort.by="B", number = nrow(fit2), coef = 1)
+	tT = topTable(fit2, adjust = "BH", sort.by="B", number = nrow(fit2), coef = 1, confint = TRUE)
 	# tT = tT[tT$P.Value < pval_thresh, ]
 
   #calculate the average vs all of the other cell types
@@ -104,10 +118,18 @@ dfxp_function <- function(cell_type, list_other_cells){
 }
 
 zeis_oli_df = dfxp_function("Oligodendrocyte", list("Neuron", "Astrocyte", "Microglia", "Endothelial"))
-zeis_neu_df = dfxp_function("Neuron", list("Oligodendrocyte", "Astrocyte", "Microglia", "Endothelial"))
-zeis_ast_df = dfxp_function("Astrocyte", list("Neuron", "Oligodendrocyte", "Microglia", "Endothelial"))
-zeis_mic_df = dfxp_function("Microglia", list("Neuron", "Astrocyte", "Oligodendrocyte", "Endothelial"))
-zeis_end_df = dfxp_function("Endothelial", list("Neuron", "Astrocyte", "Microglia", "Oligodendrocyte"))
+zeis_neu_df = dfxp_function("Neuron", list("Oligodendrocyte", "Astrocyte", "Microglia", "Endothelial", "OPC"))
+zeis_ast_df = dfxp_function("Astrocyte", list("Neuron", "Oligodendrocyte", "Microglia", "Endothelial", "OPC"))
+zeis_mic_df = dfxp_function("Microglia", list("Neuron", "Astrocyte", "Oligodendrocyte", "Endothelial", "OPC"))
+zeis_end_df = dfxp_function("Endothelial", list("Neuron", "Astrocyte", "Microglia", "Oligodendrocyte", "OPC"))
+zeis_opc_df = dfxp_function("OPC", list("Neuron", "Astrocyte", "Microglia", "Endothelial"))
+
+saveRDS(zeis_oli_df, "data/dfxp/zeis_oli_df_dfxp.rds")
+saveRDS(zeis_neu_df, "data/dfxp/zeis_neu_df_dfxp.rds")
+saveRDS(zeis_ast_df, "data/dfxp/zeis_ast_df_dfxp.rds")
+saveRDS(zeis_mic_df, "data/dfxp/zeis_mic_df_dfxp.rds")
+saveRDS(zeis_end_df, "data/dfxp/zeis_end_df_dfxp.rds")
+saveRDS(zeis_opc_df, "data/dfxp/zeis_opc_df_dfxp.rds")
 
 #create a modified volcano plot
 plot(log(zeis_oli_df$mean_fc, 2), -log(zeis_oli_df$P.Value, 10))

@@ -25,6 +25,7 @@ sharma_num[is.na(sharma_num)] = 0
 rownames(sharma_num) = make.unique(sharma[ , colnames(sharma) %in% "GeneName"])
 
 sharma_cell_types = colnames(sharma_num)
+sharma_cell_types[grepl("Oligodendrocytes div1", sharma_cell_types)] = "OPC"
 sharma_cell_types[grepl("Oligodendrocytes div4", sharma_cell_types)] = "Oligodendrocyte"
 sharma_cell_types[grepl("adult microglia", sharma_cell_types)] = "Microglia"
 sharma_cell_types[grepl("cortical neurons div10", sharma_cell_types)] = "Neuron"
@@ -54,7 +55,7 @@ dfxp_function <- function(cell_type, list_other_cells){
 	fit2 = contrasts.fit(fit, contrast_matrix)
 	fit2 = eBayes(fit2, 0.01, trend = TRUE)
   print(head(fit2$coefficients))
-	tT = topTable(fit2, adjust = "BH", sort.by="B", number = nrow(fit2), coef = 1)
+	tT = topTable(fit2, adjust = "BH", sort.by="B", number = nrow(fit2), coef = 1, confint = TRUE)
 	# tT = tT[tT$P.Value < pval_thresh, ]
 
   #calculate the average vs all of the other cell types
@@ -82,9 +83,16 @@ dfxp_function <- function(cell_type, list_other_cells){
 }
 
 sharma_oli_df = dfxp_function("Oligodendrocyte", list("Neuron", "Astrocyte", "Microglia", "Endothelial"))
-sharma_neu_df = dfxp_function("Neuron", list("Oligodendrocyte", "Astrocyte", "Microglia", "Endothelial"))
-sharma_ast_df = dfxp_function("Astrocyte", list("Neuron", "Oligodendrocyte", "Microglia", "Endothelial"))
-sharma_mic_df = dfxp_function("Microglia", list("Neuron", "Astrocyte", "Oligodendrocyte", "Endothelial"))
+sharma_neu_df = dfxp_function("Neuron", list("Oligodendrocyte", "Astrocyte", "Microglia", "Endothelial", "OPC"))
+sharma_ast_df = dfxp_function("Astrocyte", list("Neuron", "Oligodendrocyte", "Microglia", "Endothelial", "OPC"))
+sharma_mic_df = dfxp_function("Microglia", list("Neuron", "Astrocyte", "Oligodendrocyte", "Endothelial", "OPC"))
+sharma_opc_df = dfxp_function("OPC", list("Neuron", "Astrocyte", "Microglia", "Endothelial"))
+
+saveRDS(sharma_oli_df, "data/dfxp/sharma_oli_df_dfxp.rds")
+saveRDS(sharma_neu_df, "data/dfxp/sharma_neu_df_dfxp.rds")
+saveRDS(sharma_ast_df, "data/dfxp/sharma_ast_df_dfxp.rds")
+saveRDS(sharma_mic_df, "data/dfxp/sharma_mic_df_dfxp.rds")
+saveRDS(sharma_opc_df, "data/dfxp/sharma_opc_df_dfxp.rds")
 
 #create a modified volcano plot
 plot(log(sharma_oli_df$mean_fc, 2), -log(sharma_oli_df$P.Value, 10))

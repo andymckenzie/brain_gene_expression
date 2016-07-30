@@ -86,7 +86,7 @@ dfxp_function <- function(cell_type, list_other_cells){
 	fit2 = contrasts.fit(fit, contrast_matrix)
 	fit2 = eBayes(fit2, 0.01, trend = TRUE)
   print(head(fit2$coefficients))
-	tT = topTable(fit2, adjust = "BH", sort.by="B", number = nrow(fit2), coef = 1)
+	tT = topTable(fit2, adjust = "BH", sort.by="B", number = nrow(fit2), coef = 1, confint = TRUE)
 	# tT = tT[tT$P.Value < pval_thresh, ]
 
   #calculate the average vs all of the other cell types
@@ -113,10 +113,18 @@ dfxp_function <- function(cell_type, list_other_cells){
 }
 
 d15_oli_df = dfxp_function("Oligodendrocyte", list("Neuron", "Astrocyte", "Microglia", "Endothelial"))
-d15_neu_df = dfxp_function("Neuron", list("Oligodendrocyte", "Astrocyte", "Microglia", "Endothelial"))
-d15_ast_df = dfxp_function("Astrocyte", list("Neuron", "Oligodendrocyte", "Microglia", "Endothelial"))
-d15_mic_df = dfxp_function("Microglia", list("Neuron", "Astrocyte", "Oligodendrocyte", "Endothelial"))
-d15_end_df = dfxp_function("Endothelial", list("Neuron", "Astrocyte", "Microglia", "Oligodendrocyte"))
+d15_neu_df = dfxp_function("Neuron", list("Oligodendrocyte", "Astrocyte", "Microglia", "Endothelial", "OPC"))
+d15_ast_df = dfxp_function("Astrocyte", list("Neuron", "Oligodendrocyte", "Microglia", "Endothelial", "OPC"))
+d15_mic_df = dfxp_function("Microglia", list("Neuron", "Astrocyte", "Oligodendrocyte", "Endothelial", "OPC"))
+d15_end_df = dfxp_function("Endothelial", list("Neuron", "Astrocyte", "Microglia", "Oligodendrocyte", "OPC"))
+d15_opc_df = dfxp_function("OPC", list("Neuron", "Astrocyte", "Microglia", "Endothelial"))
+
+saveRDS(d15_oli_df, "data/dfxp/d15_oli_df_dfxp.rds")
+saveRDS(d15_neu_df, "data/dfxp/d15_neu_df_dfxp.rds")
+saveRDS(d15_ast_df, "data/dfxp/d15_ast_df_dfxp.rds")
+saveRDS(d15_mic_df, "data/dfxp/d15_mic_df_dfxp.rds")
+saveRDS(d15_end_df, "data/dfxp/d15_end_df_dfxp.rds")
+saveRDS(d15_opc_df, "data/dfxp/d15_opc_df_dfxp.rds")
 
 #create a modified volcano plot
 plot(log(d15_oli_df$mean_fc, 2), -log(d15_oli_df$P.Value, 10))

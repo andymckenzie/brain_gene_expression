@@ -68,7 +68,7 @@ dfxp_function <- function(cell_type, list_other_cells){
 	fit2 = contrasts.fit(fit, contrast_matrix)
 	fit2 = eBayes(fit2, 0.01, trend = TRUE)
   print(head(fit2$coefficients))
-	tT = topTable(fit2, adjust = "BH", sort.by="B", number = nrow(fit2), coef = 1)
+	tT = topTable(fit2, adjust = "BH", sort.by="B", number = nrow(fit2), coef = 1, confint = TRUE)
 	# tT = tT[tT$P.Value < pval_thresh, ]
 
   #calculate the average vs all of the other cell types
@@ -96,10 +96,18 @@ dfxp_function <- function(cell_type, list_other_cells){
 }
 
 tasic_oli_df = dfxp_function("Oligodendrocyte", list("Neuron", "Astrocyte", "Microglia", "Endothelial"))
-tasic_neu_df = dfxp_function("Neuron", list("Oligodendrocyte", "Astrocyte", "Microglia", "Endothelial"))
-tasic_ast_df = dfxp_function("Astrocyte", list("Neuron", "Oligodendrocyte", "Microglia", "Endothelial"))
-tasic_mic_df = dfxp_function("Microglia", list("Neuron", "Astrocyte", "Oligodendrocyte", "Endothelial"))
-tasic_end_df = dfxp_function("Endothelial", list("Neuron", "Astrocyte", "Microglia", "Oligodendrocyte"))
+tasic_neu_df = dfxp_function("Neuron", list("Oligodendrocyte", "Astrocyte", "Microglia", "Endothelial", "OPC"))
+tasic_ast_df = dfxp_function("Astrocyte", list("Neuron", "Oligodendrocyte", "Microglia", "Endothelial", "OPC"))
+tasic_mic_df = dfxp_function("Microglia", list("Neuron", "Astrocyte", "Oligodendrocyte", "Endothelial", "OPC"))
+tasic_end_df = dfxp_function("Endothelial", list("Neuron", "Astrocyte", "Microglia", "Oligodendrocyte", "OPC"))
+tasic_opc_df = dfxp_function("OPC", list("Neuron", "Astrocyte", "Microglia", "Endothelial"))
+
+saveRDS(tasic_oli_df, "data/dfxp/tasic_oli_df_dfxp.rds")
+saveRDS(tasic_neu_df, "data/dfxp/tasic_neu_df_dfxp.rds")
+saveRDS(tasic_ast_df, "data/dfxp/tasic_ast_df_dfxp.rds")
+saveRDS(tasic_mic_df, "data/dfxp/tasic_mic_df_dfxp.rds")
+saveRDS(tasic_end_df, "data/dfxp/tasic_end_df_dfxp.rds")
+saveRDS(tasic_opc_df, "data/dfxp/tasic_opc_df_dfxp.rds")
 
 #create a modified volcano plot
 plot(log(tasic_oli_df$mean_fc, 2), -log(tasic_oli_df$P.Value, 10))

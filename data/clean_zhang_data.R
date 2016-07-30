@@ -72,7 +72,7 @@ dfxp_function <- function(cell_type, list_other_cells){
   str(fit2)
 	fit2 = eBayes(fit2, 0.01, trend = TRUE)
   print(head(fit2$coefficients))
-	tT = topTable(fit2, adjust = "BH", sort.by="B", number = nrow(fit2), coef = 1)
+	tT = topTable(fit2, adjust = "BH", sort.by="B", number = nrow(fit2), coef = 1, confint = TRUE)
 
   #calculate the average vs all of the other cell types
 	for(i in 1:length(list_other_cells)){
@@ -101,7 +101,7 @@ dfxp_function <- function(cell_type, list_other_cells){
 
 	#since already sorted, need to merge via rownames
 	toptable = merge(tT, mean_fc_names, by.x = "row.names", by.y = "zhang_names")
-	toptable = toptable[order(toptable$P.Value), ]
+	toptable = toptable[order(toptable$t), ]
 
 	return(toptable)
 
@@ -116,9 +116,8 @@ z16_ast_df = dfxp_function("AST", list("NEU", "OLI", "MIC", "END"))
 z16_mic_df = dfxp_function("MIC", list("NEU", "AST", "OLI", "END"))
 z16_end_df = dfxp_function("END", list("NEU", "AST", "MIC", "OLI"))
 
-#create a modified volcano plot
-plot(z16_oli_df$mean_fc, -log(z16_oli_df$P.Value, 10))
-plot(z16_neu_df$mean_fc, -log(z16_neu_df$P.Value, 10))
-plot(z16_ast_df$mean_fc, -log(z16_ast_df$P.Value, 10))
-plot(z16_mic_df$mean_fc, -log(z16_mic_df$P.Value, 10))
-plot(z16_end_df$mean_fc, -log(z16_end_df$P.Value, 10))
+saveRDS(z16_oli_df, "data/dfxp/z16_oli_df_dfxp.rds")
+saveRDS(z16_neu_df, "data/dfxp/z16_neu_df_dfxp.rds")
+saveRDS(z16_ast_df, "data/dfxp/z16_ast_df_dfxp.rds")
+saveRDS(z16_mic_df, "data/dfxp/z16_mic_df_dfxp.rds")
+saveRDS(z16_end_df, "data/dfxp/z16_end_df_dfxp.rds")
