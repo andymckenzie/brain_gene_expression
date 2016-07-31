@@ -71,16 +71,18 @@ gene_symbols = switchGenesToHGCN(rownames(dar_merged))
 rownames(dar_merged) = make.unique(gene_symbols)
 collapsed_df = collapseRows(dar_merged, rowGroup = gene_symbols, rowID = make.unique(gene_symbols), method="MaxMean")
 dar_merged = dar_merged[collapsed_df$selectedRow, ]
-dar_norm_cells = dar_norm_cells[collapsed_df$selectedRow, ]
+dar_gnxp_log = dar_gnxp_log[collapsed_df$selectedRow, ]
 gene_symbols = gene_symbols[collapsed_df$selectedRow]
 rownames(dar_merged) = gene_symbols
+dar_gnxp_log = dar_gnxp_log[!gene_symbols %in% "ALIGNMENT_NOT_UNIQUE", ]
+dar_merged = dar_merged[!gene_symbols %in% "ALIGNMENT_NOT_UNIQUE", ]
 
 #############################
 # dfxp
 
 dfxp_function <- function(cell_type, list_other_cells){
 
-  expr_average = rowMeans(as.matrix(dar_norm_cells[ , dar_cell_types == cell_type]))
+  expr_average = rowMeans(as.matrix(dar_gnxp_log[ , dar_cell_types == cell_type]))
 
   celltypes_contrast = dar_cell_types
   celltypes_contrast = gsub(cell_type, "MAIN", celltypes_contrast)

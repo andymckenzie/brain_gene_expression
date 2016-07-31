@@ -17,20 +17,12 @@ source("/Users/amckenz/Dropbox/zhang/general_code/get_fold_enrichment.R")
 #then find jaccard index of the plot, and spit back the results.
 #part of this function needs to clean the gene symbols with HGNChelper
 #and then purge/merge the df's so that only the shared genes are included.
-compare_two_signatures <- function(df1, df2, nTerms, orderByCol, orderDecr, cell, HGNC_clean = FALSE, toupper = TRUE){
+compare_two_signatures <- function(df1, df2, nTerms, orderByCol, orderDecr, cell){
 
-  if(HGNC_clean){
-    df1$Row.names = switchGenesToHGCN(df1$Row.names)
-    df2$Row.names = switchGenesToHGCN(df2$Row.names)
-  }
-  if(toupper){
-    df1$Row.names = toupper(df1$Row.names)
-    df2$Row.names = toupper(df2$Row.names)
-  }
-  universe = intersect(df1$Row.names, df2$Row.names)
-  df1 = df1[df1$Row.names %in% universe, ]
-  df2 = df2[df2$Row.names %in% universe, ]
-  df2 = df2[!duplicated(df2$Row.names), ]
+  universe = intersect(df1$genes, df2$genes)
+  df1 = df1[df1$genes %in% universe, ]
+  df2 = df2[df2$genes %in% universe, ]
+  df2 = df2[!duplicated(df2$genes), ]
 
   df1 = df1[order(df1[ , orderByCol], decreasing = orderDecr), ]
   df2 = df2[order(df2[ , orderByCol], decreasing = orderDecr), ]
@@ -39,8 +31,8 @@ compare_two_signatures <- function(df1, df2, nTerms, orderByCol, orderDecr, cell
   pvals = vector()
 
   for(i in 1:length(nTerms)){
-    top_n_df1 = unique(head(df1, nTerms[i])$Row.names)
-    top_n_df2 = unique(head(df2, nTerms[i])$Row.names)
+    top_n_df1 = unique(head(df1, nTerms[i])$genes)
+    top_n_df2 = unique(head(df2, nTerms[i])$genes)
     res = get_fold_enrichment(top_n_df1, top_n_df2, universe)
     fe[i] = res[[1]]
     pvals[i] = res[[2]]
@@ -82,7 +74,6 @@ zeis_ast_df = readRDS("data/dfxp/zeis_ast_df_dfxp.rds")
 zeis_neu_df = readRDS("data/dfxp/zeis_neu_df_dfxp.rds")
 zeis_mic_df = readRDS("data/dfxp/zeis_mic_df_dfxp.rds")
 zeis_end_df = readRDS("data/dfxp/zeis_end_df_dfxp.rds")
-zeis_opc_df = readRDS("data/dfxp/zeis_opc_df_dfxp.rds")
 
 sharma_oli_df = readRDS("data/dfxp/sharma_oli_df_dfxp.rds")
 sharma_ast_df = readRDS("data/dfxp/sharma_ast_df_dfxp.rds")
@@ -114,7 +105,7 @@ make_volcano_facet <- function(data1){
     data_df = rbind(data_df, res_end)
   }
 
-  if(data1 != "z16"){
+  if(!data1 %in% c("z16", "zeis")){
     res_opc = get(paste0(data1, "_opc_df"))
     res_opc$cell = rep("OPC", nrow(res_opc))
     data_df = rbind(data_df, res_opc)
@@ -134,10 +125,6 @@ make_volcano_facet <- function(data1){
 }
 
 make_volcano_facet("zm16")
-
-
-
-
 
 
 compare_data_sets <- function(data1, data2, nTerms, orderByCol, orderDecr = TRUE, log_fe = TRUE){
@@ -170,23 +157,31 @@ compare_data_sets <- function(data1, data2, nTerms, orderByCol, orderDecr = TRUE
   }
 
   #because z16 doesn't have OPC cell data
-  if(data1 != "z16" & data2 != "z16"){
+  if((!data1 %in% c("z16", "zeis")) & (!data2 %in% c("z16", "zeis"))){
     res_opc = compare_two_signatures(
       get(paste0(data1, "_opc_df")), get(paste0(data2, "_opc_df")), cell = "opc",
       nTerms = nTerms, orderByCol = orderByCol, orderDecr = orderDecr)
     fe_df = rbind(fe_df, res_opc[ , c("fe", "nTerms", "cell")])
   }
 
+  data1 = data_names_switch(data1)
+  data2 = data_names_switch(data2)
 
   if(log_fe){ fe_df$fe = log(fe_df$fe , 2) }
 
   fe_layers_plot = ggplot(data = fe_df, aes(x = nTerms, y = fe,
 	    group = cell, colour = cell)) + geom_line() + geom_point() +
-    theme_bw() + xlab("Number of Top Cell-Type Specific Genes") +
-    ylab("Fold Enrichment") + scale_colour_manual("", values = cbPalette) +
+    theme_bw() +
+    # xlab("Number of Top Cell-Type Specific Genes") +
+    # ylab("Fold Enrichment") +
+    scale_colour_manual("", values = cbPalette, guide = FALSE) +
     geom_hline(yintercept = 1, linetype = "dotted") +
-    guides(fill = guide_legend(title = "Cell")) + ylim(c(0, 10)) +
-    scale_x_log10(breaks = nTerms, labels = nTerms)
+    # guides(fill = guide_legend(title = "Cell")) + #ylim(c(0, 10)) +
+    scale_x_log10(breaks = nTerms, labels = nTerms) +
+    ggtitle(paste0(data1, " vs. ", data2)) + xlab("") + ylab("") +
+    theme(text = element_text(size = 6))
+
+  if(log_fe) { fe_layers_plot = fe_layers_plot + ylim(c(0, 13))}
 
   fe_df100 = fe_df[fe_df$nTerms == 100, ]
 
@@ -194,27 +189,45 @@ compare_data_sets <- function(data1, data2, nTerms, orderByCol, orderDecr = TRUE
 
 }
 
+data_names_switch <- function(data_names){
+
+  data_names = gsub("z16", "Zhang (2016)", data_names)
+  data_names = gsub("d15", "Darmanis", data_names)
+  data_names = gsub("z15", "Zhang (2015)", data_names)
+  data_names = gsub("zeis", "Zeisel", data_names)
+  data_names = gsub("tasic", "Tasic", data_names)
+  data_names = gsub("sharma", "Sharma", data_names)
+
+  return(data_names)
+
+}
+
 terms_vector = c(10, 20, 50, 100, 200, 500, 1000)
 
-z16_d15 = compare_data_sets(data1 = "z16", data2 = "d15", nTerms = terms_vector, orderByCol = "logFC", orderDecr = TRUE)
-z16_z15 = compare_data_sets(data1 = "z16", data2 = "z15", nTerms = terms_vector, orderByCol = "logFC", orderDecr = TRUE)
-z16_sharma = compare_data_sets(data1 = "z16", data2 = "sharma", nTerms = terms_vector, orderByCol = "logFC", orderDecr = TRUE)
-z16_zeis = compare_data_sets(data1 = "z16", data2 = "zeis", nTerms = terms_vector, orderByCol = "logFC", orderDecr = TRUE)
-z16_tasic = compare_data_sets(data1 = "z16", data2 = "tasic", nTerms = terms_vector, orderByCol = "logFC", orderDecr = TRUE)
+z16_d15 = compare_data_sets(data1 = "z16", data2 = "d15", nTerms = terms_vector, orderByCol = "fc_zscore", orderDecr = TRUE)
+z16_z15 = compare_data_sets(data1 = "z16", data2 = "z15", nTerms = terms_vector, orderByCol = "fc_zscore", orderDecr = TRUE)
+z16_sharma = compare_data_sets(data1 = "z16", data2 = "sharma", nTerms = terms_vector, orderByCol = "fc_zscore", orderDecr = TRUE)
+z16_zeis = compare_data_sets(data1 = "z16", data2 = "zeis", nTerms = terms_vector, orderByCol = "fc_zscore", orderDecr = TRUE)
+z16_tasic = compare_data_sets(data1 = "z16", data2 = "tasic", nTerms = terms_vector, orderByCol = "fc_zscore", orderDecr = TRUE)
 
-d15_z15 = compare_data_sets(data1 = "d15", data2 = "z15", nTerms = terms_vector, orderByCol = "logFC", orderDecr = TRUE)
-d15_sharma = compare_data_sets(data1 = "d15", data2 = "sharma", nTerms = terms_vector, orderByCol = "logFC", orderDecr = TRUE)
-d15_zeis = compare_data_sets(data1 = "d15", data2 = "zeis", nTerms = terms_vector, orderByCol = "logFC", orderDecr = TRUE)
-d15_tasic = compare_data_sets(data1 = "d15", data2 = "tasic", nTerms = terms_vector, orderByCol = "logFC", orderDecr = TRUE)
+d15_z15 = compare_data_sets(data1 = "d15", data2 = "z15", nTerms = terms_vector, orderByCol = "fc_zscore", orderDecr = TRUE)
+d15_sharma = compare_data_sets(data1 = "d15", data2 = "sharma", nTerms = terms_vector, orderByCol = "fc_zscore", orderDecr = TRUE)
+d15_zeis = compare_data_sets(data1 = "d15", data2 = "zeis", nTerms = terms_vector, orderByCol = "fc_zscore", orderDecr = TRUE)
+d15_tasic = compare_data_sets(data1 = "d15", data2 = "tasic", nTerms = terms_vector, orderByCol = "fc_zscore", orderDecr = TRUE)
 
-z15_sharma = compare_data_sets(data1 = "z15", data2 = "sharma", nTerms = terms_vector, orderByCol = "logFC", orderDecr = TRUE)
-z15_zeis = compare_data_sets(data1 = "z15", data2 = "zeis", nTerms = terms_vector, orderByCol = "logFC", orderDecr = TRUE)
-z15_tasic = compare_data_sets(data1 = "z15", data2 = "tasic", nTerms = terms_vector, orderByCol = "logFC", orderDecr = TRUE)
+z15_sharma = compare_data_sets(data1 = "z15", data2 = "sharma", nTerms = terms_vector, orderByCol = "fc_zscore", orderDecr = TRUE)
+z15_zeis = compare_data_sets(data1 = "z15", data2 = "zeis", nTerms = terms_vector, orderByCol = "fc_zscore", orderDecr = TRUE)
+z15_tasic = compare_data_sets(data1 = "z15", data2 = "tasic", nTerms = terms_vector, orderByCol = "fc_zscore", orderDecr = TRUE)
 
-sharma_zeis = compare_data_sets(data1 = "sharma", data2 = "zeis", nTerms = terms_vector, orderByCol = "logFC", orderDecr = TRUE)
-sharma_tasic = compare_data_sets(data1 = "sharma", data2 = "tasic", nTerms = terms_vector, orderByCol = "logFC", orderDecr = TRUE)
+sharma_zeis = compare_data_sets(data1 = "sharma", data2 = "zeis", nTerms = terms_vector, orderByCol = "fc_zscore", orderDecr = TRUE)
+sharma_tasic = compare_data_sets(data1 = "sharma", data2 = "tasic", nTerms = terms_vector, orderByCol = "fc_zscore", orderDecr = TRUE)
 
-zeis_tasic = compare_data_sets(data1 = "zeis", data2 = "tasic", nTerms = terms_vector, orderByCol = "logFC", orderDecr = TRUE)
+zeis_tasic = compare_data_sets(data1 = "zeis", data2 = "tasic", nTerms = terms_vector, orderByCol = "fc_zscore", orderDecr = TRUE)
+
+source("/Users/amckenz/Documents/github/brain_gene_expression/multiplot.R")
+multiplot(z16_d15[[1]], z16_z15[[1]], z16_sharma[[1]], z16_zeis[[1]], z16_tasic[[1]],
+  d15_z15[[1]], d15_sharma[[1]], d15_zeis[[1]], d15_tasic[[1]],
+  z15_sharma[[1]], z15_zeis[[1]], z15_tasic[[1]], sharma_zeis[[1]], sharma_tasic[[1]], zeis_tasic[[1]], cols = 3)
 
 # probably just going to ignore the proteomics data for now ...
 #z16_sharmap = compare_data_sets(data1 = "z16", data2 = "sharmap", nTerms = terms_vector, orderByCol = "logFC", orderDecr = TRUE)
@@ -258,7 +271,7 @@ for(i in 1:n_data){
       tmp_end = get(paste0(data_sets[i], "_", data_sets[j]))[["fe_df100"]]
       fe_data_end[i, j] = tmp_end[tmp_end$cell == "end", "fe"]
     }
-    if(data_sets[i] == "z16" | data_sets[j] == "z16"){
+    if(data_sets[i] %in% c("z16", "zeis")) | data_sets[j] %in% c("z16", "zeis"))){
       print("z16 skip")
     } else {
       tmp_opc = get(paste0(data_sets[i], "_", data_sets[j]))[["fe_df100"]]
@@ -286,7 +299,7 @@ fe_data_end = fe_data_end[!rownames(fe_data_end) %in% "sharma", !colnames(fe_dat
 fe_data_end[lower.tri(fe_data_end)] = t(fe_data_end)[lower.tri(fe_data_end)]
 corrplot.mixed(fe_data_end,  lower = "number", upper = "circle", tl.pos = "lt", addgrid.col = "black", is.corr = FALSE)
 
-fe_data_opc = fe_data_opc[!rownames(fe_data_opc) %in% "z16", !colnames(fe_data_opc) %in% "z16"]
+fe_data_opc = fe_data_opc[!rownames(fe_data_opc) %in% c("z16", "zeis"), !colnames(fe_data_opc) %in% c("z16", "zeis")]
 fe_data_opc[lower.tri(fe_data_opc)] = t(fe_data_opc)[lower.tri(fe_data_opc)]
 corrplot.mixed(fe_data_opc, lower = "number", upper = "circle", tl.pos = "lt", addgrid.col = "black", is.corr = FALSE)
 
@@ -295,7 +308,7 @@ create_forest_plot <- function(gene, cell, subset = NULL){
   drops = NULL
 
   if(cell == "opc"){
-    drops = c(drops, "z16")
+    drops = c(drops, "z16", "zeis")
   }
   if(cell == "end"){
     drops = c(drops, "sharma")
@@ -304,10 +317,10 @@ create_forest_plot <- function(gene, cell, subset = NULL){
 }
 
 #this function ranks the genes across multiple data sets
-rank_genes_logfc <- function(cell, subset = NULL, nGenes){
+rank_genes_logfc <- function(cell, subset = NULL, mouse_vs_human = FALSE, orderDown = TRUE){
 
   drops = NULL
-  if(cell == "opc"){ drops = c(drops, "z16") }
+  if(cell == "opc"){ drops = c(drops, "z16", "zeis") }
   if(cell == "end"){ drops = c(drops, "sharma") }
   if(!is.null(subset)){
     if(subset == "mouse"){ drops = c(drops, "z16", "d15") }
@@ -328,43 +341,81 @@ rank_genes_logfc <- function(cell, subset = NULL, nGenes){
   for(i in 1:n_data_sets){
     data_keep[i]
     tmp = get(paste0(data_keep[i], "_", cell, "_df"))
-    tmp$Row.names = toupper(tmp$Row.names)
-    for(j in 2:ncol(tmp)){
+    tmp$genes = toupper(tmp$genes)
+    for(j in 2:(ncol(tmp) - 1)){
       colnames(tmp)[j] = paste0(colnames(tmp)[j], "_", data_keep[i])
     }
     if(i == 1){
       merged = tmp
     } else {
-      merged = merge(merged, tmp, by = "Row.names", all = TRUE) #, all = TRUE
+      merged = merge(merged, tmp, by = "genes", all = TRUE) #, all = TRUE
     }
-    str(merged)
   }
 
   #filter to remove genes that are present in too few of the data sets
-  log_fc_only_merged = merged[ , grepl("logFC", colnames(merged))]
+  log_fc_only_merged = merged[ , grepl("fc_zscore", colnames(merged))]
   merged$n_data_na = apply(log_fc_only_merged, 1, function(x) sum(is.na(x)))
-  str(merged)
-  print(table(merged$n_data_na > n_data_sets * 0.5))
-  merged = merged[!merged$n_data_na > n_data_sets * 0.5, ]
-  str(merged)
+  merged = merged[!merged$n_data_na >= n_data_sets * 0.5, ]
+  #if merging mice and human, require at least one of each
+  if(is.null(subset)){
+    log_fc_only_merged = merged[ , grepl("fc_zscore", colnames(merged))]
+    merged$non_data_na_human = apply(log_fc_only_merged, 1, function(x) any(!is.na(x[data_sets %in% c("z16", "d15")])))
+    merged$non_data_na_mice = apply(log_fc_only_merged, 1, function(x) any(!is.na(x[data_sets %in% c("z15", "sharma", "zeis", "tasic")])))
+    merged = merged[merged$non_data_na_human, ]
+    merged = merged[merged$non_data_na_mice, ]
+  }
 
   #calculate the grand mean
-  log_fc_merged = merged[ , grepl("logFC", colnames(merged))]
-  log_fc_merged$grand_mean = apply(log_fc_merged, 1, mean, na.rm = TRUE)
-  log_fc_merged$gene = merged$Row.names
+  log_fc_merged = merged[ , grepl("fc_zscore", colnames(merged))]
+  log_fc_merged$grand_mean = apply(log_fc_merged, 1, median, na.rm = TRUE)
+  log_fc_merged$gene = merged$genes
   log_fc_merged = log_fc_merged[order(log_fc_merged$grand_mean, decreasing = TRUE), ]
 
-  #return the top N genes (nGenes) ranked by their means across conditions
-
-  return(log_fc_merged)
+  #mouse vs human difference
+  if(mouse_vs_human){
+    log_fc_merged = merged[ , grepl("fc_zscore", colnames(merged))]
+    t_res = vector(mode = "numeric", length = nrow(log_fc_merged))
+    for(i in 1:nrow(log_fc_merged)){
+      print(i)
+      str(as.numeric(log_fc_merged[i, data_sets %in% c("z16", "d15")]))
+      str(as.numeric(log_fc_merged[i, data_sets %in% c("z15", "sharma", "zeis", "tasic")]))
+      str(mean(as.numeric(log_fc_merged[i, data_sets %in% c("z16", "d15")]), na.rm = TRUE))
+      str(mean(as.numeric(log_fc_merged[i, data_sets %in% c("z15", "sharma", "zeis", "tasic")]), na.rm = TRUE))
+      t_res[i] = mean(as.numeric(log_fc_merged[i, data_sets %in% c("z16", "d15")]), na.rm = TRUE) -
+        mean(as.numeric(log_fc_merged[i, data_sets %in% c("z15", "sharma", "zeis", "tasic")]), na.rm = TRUE)
+      # t_res[i] = t.test(as.numeric(
+      #   log_fc_merged[i, data_sets %in% c("z16", "d15")]),
+      #   as.numeric(log_fc_merged[i, data_sets %in% c("z15", "sharma", "zeis", "tasic")]))$statistic
+    }
+    log_fc_merged$mouse_vs_human_res = t_res
+    log_fc_merged$gene = merged$genes
+    # log_fc_merged$mouse_vs_human_res =
+    #   mean(as.numeric(log_fc_merged[, data_sets %in% c("z16", "d15")])) -
+    #   mean(as.numeric(log_fc_merged[, data_sets %in% c("z15", "sharma", "zeis", "tasic")]))
+    log_fc_merged = log_fc_merged[order(log_fc_merged$mouse_vs_human_res, decreasing = orderDown), ]
+    return(log_fc_merged)
+  } else {
+    return(log_fc_merged)
+  }
 
 }
 
-oli_top = rank_genes_logfc("oli", subset = "mouse")
+oli_mouse_vs_human = rank_genes_logfc("oli", mouse_vs_human = TRUE, orderDown = TRUE)
+neu_human_vs_mouse = rank_genes_logfc("neu", mouse_vs_human = TRUE, orderDown = FALSE)
+
+oli_top_human = rank_genes_logfc("oli", subset = "human")
 neu_top = rank_genes_logfc("neu")
 mic_top = rank_genes_logfc("mic")
 ast_top = rank_genes_logfc("ast")
 end_top = rank_genes_logfc("end")
 opc_top = rank_genes_logfc("opc")
+
+oli_top_combo
+
+oli_top_mouse
+
+oli_human_vs_mouse_difference =
+
+oli_mouse_vs_human_difference =
 
 #identify the genes with the largest difference in brain cell-type specific expression between mice and humans?
