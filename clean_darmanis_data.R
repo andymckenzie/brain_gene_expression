@@ -1,11 +1,12 @@
 
 library(edgeR)
 library(DGCA)
+library(limma)
+library(HGNChelper)
+
 
 ############################
 # functions
-
-std_error <- function(x) sd(x)/sqrt(length(x))
 
 #https://www.biostars.org/p/72846/
 cpm_tmm <- function(counts){
@@ -16,8 +17,6 @@ cpm_tmm <- function(counts){
 
 ###################################
 # darmanis
-
-cutoff_thresh_percentile = 0.5
 
 setwd("/Users/amckenz/Documents/github/brain_gene_expression/")
 
@@ -65,14 +64,23 @@ if(!identical(colnames(dar_norm_cells), type_gsm_clean_names)) stop("Pheno table
 
 dar_gnxp_log = log(dar_norm_cells + 1, 2)
 
+##########################
+#convert to cleaned human gene sybmols where possible
+source("/Users/amckenz/Documents/github/alzolig/convert_mgi_to_hgnc.R")
+gene_symbols = switchGenesToHGCN(rownames(dar_merged))
+rownames(dar_merged) = make.unique(gene_symbols)
+collapsed_df = collapseRows(dar_merged, rowGroup = gene_symbols, rowID = make.unique(gene_symbols), method="MaxMean")
+dar_merged = dar_merged[collapsed_df$selectedRow, ]
+dar_norm_cells = dar_norm_cells[collapsed_df$selectedRow, ]
+gene_symbols = gene_symbols[collapsed_df$selectedRow]
+rownames(dar_merged) = gene_symbols
+
+#############################
+# dfxp
+
 dfxp_function <- function(cell_type, list_other_cells){
 
-	#for a given cell type that you are considering
-	#remove that gene if it has too low of expression *in that cell type*
-	#find the average of each gene in its own cell type
   expr_average = rowMeans(as.matrix(dar_norm_cells[ , dar_cell_types == cell_type]))
-	cutoff = as.numeric(quantile(expr_average, cutoff_thresh_percentile, names = FALSE))
-	dar_trimmed = dar_gnxp_log[(expr_average > cutoff), ]
 
   celltypes_contrast = dar_cell_types
   celltypes_contrast = gsub(cell_type, "MAIN", celltypes_contrast)
@@ -80,33 +88,20 @@ dfxp_function <- function(cell_type, list_other_cells){
     celltypes_contrast = gsub(list_other_cells[[i]], "OTHERS", celltypes_contrast)
   }
   design = makeDesign(celltypes_contrast)
-	fit = lmFit(dar_trimmed, design)
+
+  dar_voom_res = voom(dar_merged, design, plot = TRUE)
+  fit = lmFit(dar_voom_res, design)
   contrast_matrix = makeContrasts(MAIN-OTHERS, levels = as.factor(celltypes_contrast))
 
 	fit2 = contrasts.fit(fit, contrast_matrix)
-	fit2 = eBayes(fit2, 0.01, trend = TRUE)
-  print(head(fit2$coefficients))
-	tT = topTable(fit2, adjust = "BH", sort.by="B", number = nrow(fit2), coef = 1, confint = TRUE)
-	# tT = tT[tT$P.Value < pval_thresh, ]
+	fit2 = eBayes(fit2)
+	toptable = topTable(fit2, adjust = "BH", sort.by = "none", number = nrow(fit2), coef = 1, confint = TRUE)
 
-  #calculate the average vs all of the other cell types
-	for(i in 1:length(list_other_cells)){
-    mean_other = rowMeans(dar_trimmed[ , which(dar_cell_types %in% list_other_cells[[i]])])
-		if(i == 1){
-			mean_others = data.frame(mean_other)
-		} else {
-			mean_others = cbind(mean_others, mean_other)
-		}
-    str(mean_others)
-	}
-  mean_fc = rowMeans(dar_trimmed[ , which(dar_cell_types %in% cell_type)]) /
-      rowMeans(mean_others)
-	mean_fc_names = data.frame(row.names(dar_trimmed), mean_fc)
-	names(mean_fc_names) = c("dar_names", "mean_fc")
-
-	#since already sorted, need to merge via rownames
-	toptable = merge(tT, mean_fc_names, by.x = "row.names", by.y = "dar_names")
-	toptable = toptable[order(toptable$t, decreasing = TRUE), ]
+  toptable$expr_average = expr_average
+  source("shrink_logFC.R")
+  toptable$fc_zscore = shrink_pval_and_avg_expr(toptable)
+  toptable$genes = rownames(toptable)
+	toptable = toptable[order(toptable$fc_zscore, decreasing = TRUE), ]
 
 	return(toptable)
 
@@ -125,10 +120,3 @@ saveRDS(d15_ast_df, "data/dfxp/d15_ast_df_dfxp.rds")
 saveRDS(d15_mic_df, "data/dfxp/d15_mic_df_dfxp.rds")
 saveRDS(d15_end_df, "data/dfxp/d15_end_df_dfxp.rds")
 saveRDS(d15_opc_df, "data/dfxp/d15_opc_df_dfxp.rds")
-
-#create a modified volcano plot
-plot(log(d15_oli_df$mean_fc, 2), -log(d15_oli_df$P.Value, 10))
-plot(log(d15_neu_df$mean_fc, 2), -log(d15_neu_df$P.Value, 10))
-plot(log(d15_ast_df$mean_fc, 2), -log(d15_ast_df$P.Value, 10))
-plot(log(d15_mic_df$mean_fc, 2), -log(d15_mic_df$P.Value, 10))
-plot(log(d15_end_df$mean_fc, 2), -log(d15_end_df$P.Value, 10))

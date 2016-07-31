@@ -4,6 +4,7 @@ library(ggplot2)
 library(DGCA)
 library(bayesbio)
 library(corrplot)
+library(psych) #geometric.mean
 
 cbPalette = c("#CC79A7", "#E69F00", "#56B4E9", "#000000", "#009E73", "#F0E442", "#0072B2",
  "red", "lightgreen", "#999999", "#990000")
@@ -289,7 +290,7 @@ fe_data_opc = fe_data_opc[!rownames(fe_data_opc) %in% "z16", !colnames(fe_data_o
 fe_data_opc[lower.tri(fe_data_opc)] = t(fe_data_opc)[lower.tri(fe_data_opc)]
 corrplot.mixed(fe_data_opc, lower = "number", upper = "circle", tl.pos = "lt", addgrid.col = "black", is.corr = FALSE)
 
-plot_meta_analysis <- function(gene, cell, subset = NULL){
+create_forest_plot <- function(gene, cell, subset = NULL){
 
   drops = NULL
 
@@ -300,6 +301,70 @@ plot_meta_analysis <- function(gene, cell, subset = NULL){
     drops = c(drops, "sharma")
   }
 
+}
 
+#this function ranks the genes across multiple data sets
+rank_genes_logfc <- function(cell, subset = NULL, nGenes){
+
+  drops = NULL
+  if(cell == "opc"){ drops = c(drops, "z16") }
+  if(cell == "end"){ drops = c(drops, "sharma") }
+  if(!is.null(subset)){
+    if(subset == "mouse"){ drops = c(drops, "z16", "d15") }
+    if(subset == "human"){ drops = c(drops, "z15", "sharma", "zeis", "tasic") }
+  }
+  if(length(drops) == 5){ stop("No consensus is available for this cell type in this subset because there is only one data set that fit the criteria.") }
+
+  data_sets = c("z16", "d15", "z15", "sharma", "zeis", "tasic")
+  if(!is.null(drops)){
+    data_keep = data_sets[!data_sets %in% drops]
+  } else {
+    data_keep = data_sets
+  }
+
+  n_data_sets = length(data_keep)
+
+  #merge the data sets into one, keep all gene symbols
+  for(i in 1:n_data_sets){
+    data_keep[i]
+    tmp = get(paste0(data_keep[i], "_", cell, "_df"))
+    tmp$Row.names = toupper(tmp$Row.names)
+    for(j in 2:ncol(tmp)){
+      colnames(tmp)[j] = paste0(colnames(tmp)[j], "_", data_keep[i])
+    }
+    if(i == 1){
+      merged = tmp
+    } else {
+      merged = merge(merged, tmp, by = "Row.names", all = TRUE) #, all = TRUE
+    }
+    str(merged)
+  }
+
+  #filter to remove genes that are present in too few of the data sets
+  log_fc_only_merged = merged[ , grepl("logFC", colnames(merged))]
+  merged$n_data_na = apply(log_fc_only_merged, 1, function(x) sum(is.na(x)))
+  str(merged)
+  print(table(merged$n_data_na > n_data_sets * 0.5))
+  merged = merged[!merged$n_data_na > n_data_sets * 0.5, ]
+  str(merged)
+
+  #calculate the grand mean
+  log_fc_merged = merged[ , grepl("logFC", colnames(merged))]
+  log_fc_merged$grand_mean = apply(log_fc_merged, 1, mean, na.rm = TRUE)
+  log_fc_merged$gene = merged$Row.names
+  log_fc_merged = log_fc_merged[order(log_fc_merged$grand_mean, decreasing = TRUE), ]
+
+  #return the top N genes (nGenes) ranked by their means across conditions
+
+  return(log_fc_merged)
 
 }
+
+oli_top = rank_genes_logfc("oli", subset = "mouse")
+neu_top = rank_genes_logfc("neu")
+mic_top = rank_genes_logfc("mic")
+ast_top = rank_genes_logfc("ast")
+end_top = rank_genes_logfc("end")
+opc_top = rank_genes_logfc("opc")
+
+#identify the genes with the largest difference in brain cell-type specific expression between mice and humans?

@@ -1,0 +1,16 @@
+
+
+shrink_pval_and_avg_expr <- function(degs){
+
+  #find the local FDR
+  degs$locfdr = qvalue::qvalue(degs$P.Value)$lfdr
+
+  #formula from 2.2.3 http://biostats.bepress.com/cobra/art60/;
+  #also see http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-11-63
+  degs$pval_shrink_logFC = (1 - degs$locfdr) * degs$logFC
+
+  #formula from eq. 1 http://www.ncbi.nlm.nih.gov/pmc/articles/PMC2464587/
+  degs$shrunken_logFC = (degs$pval_shrink_logFC - min(degs$expr_average)) /
+    (max(degs$expr_average) - min(degs$expr_average))
+
+}

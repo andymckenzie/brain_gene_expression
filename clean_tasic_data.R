@@ -1,14 +1,13 @@
 library(edgeR)
 library(DGCA)
+library(limma)
+library(HGNChelper)
 
-cutoff_thresh_percentile = 0.5
 
 setwd("/Users/amckenz/Documents/github/brain_gene_expression/")
 
 ############################
 # functions
-
-std_error <- function(x) sd(x)/sqrt(length(x))
 
 #https://www.biostars.org/p/72846/
 cpm_tmm <- function(counts){
@@ -24,6 +23,7 @@ metadata = read.csv("data/tasic_cell_metadata.csv")
 counts = read.csv("data/tasic_genes_counts.csv")
 rownames(counts) = counts[ , 1]
 counts = counts[ , -1]
+tasic_counts = counts
 tasic_norm = cpm_tmm(counts)
 
 sub_class = table(metadata$sub_class)
@@ -40,21 +40,30 @@ tasic_cell_types = gsub("Pvalb", "Neuron", tasic_cell_types)
 tasic_cell_types = gsub("Ndnf", "Neuron", tasic_cell_types)
 tasic_cell_types = make.names(tasic_cell_types)
 
-# colnames(tasic_total_df)[grepl("Sst", colnames(tasic_total_df))] =
-#   c("Sst Cbln4_mean", "Sst Cbln4_se", "Sst Cbln4_mean_log", "Sst Cbln4_se_log",
-#   "Sst Chodl_mean", "Sst Chodl_se", "Sst Chodl_mean_log", "Sst Chodl_se_log",
-#   "Sst Nr2f2_mean", "Sst Nr2f2_se", "Sst Nr2f2_mean_log", "Sst Nr2f2_se_log")
-
 tasic_norm_log = log(tasic_norm + 1, 2)
+
+##########################
+#convert to cleaned human gene sybmols where possible
+source("/Users/amckenz/Documents/github/alzolig/convert_mgi_to_hgnc.R")
+gene_symbols = convert_mgi_to_hgnc(rownames(tasic_counts), genome = "mm10", return_df = FALSE)
+gene_symbols = switchGenesToHGCN(gene_symbols)
+rownames(tasic_counts) = make.unique(gene_symbols)
+collapsed_df = collapseRows(tasic_counts, rowGroup = gene_symbols, rowID = make.unique(gene_symbols), method="MaxMean")
+tasic_counts = tasic_counts[collapsed_df$selectedRow, ]
+tasic_norm_log = tasic_norm_log[collapsed_df$selectedRow, ]
+gene_symbols = gene_symbols[collapsed_df$selectedRow]
+rownames(tasic_counts) = gene_symbols
+#remove the spike-ins
+mt_spike_in = grepl("MT_", rownames(tasic_counts), fixed = TRUE)
+tasic_counts = tasic_counts[!mt_spike_in, ]
+tasic_norm_log = tasic_norm_log[!mt_spike_in, ]
+
+#############################
+# dfxp
 
 dfxp_function <- function(cell_type, list_other_cells){
 
-	#for a given cell type that you are considering
-	#remove that gene if it has too low of expression *in that cell type*
-	#find the average of each gene in its own cell type
   expr_average = rowMeans(as.matrix(tasic_norm_log[ , tasic_cell_types == cell_type]))
-	cutoff = as.numeric(quantile(expr_average, cutoff_thresh_percentile, names = FALSE))
-	tasic_trimmed = tasic_norm_log[(expr_average > cutoff), ]
 
   celltypes_contrast = tasic_cell_types
   celltypes_contrast = gsub(cell_type, "MAIN", celltypes_contrast)
@@ -62,34 +71,20 @@ dfxp_function <- function(cell_type, list_other_cells){
     celltypes_contrast = gsub(list_other_cells[[i]], "OTHERS", celltypes_contrast)
   }
   design = makeDesign(celltypes_contrast)
-	fit = lmFit(tasic_trimmed, design)
+
+  tasic_voom_res = voom(tasic_counts, design, plot = TRUE)
+	fit = lmFit(tasic_voom_res, design)
   contrast_matrix = makeContrasts(MAIN-OTHERS, levels = as.factor(celltypes_contrast))
 
 	fit2 = contrasts.fit(fit, contrast_matrix)
-	fit2 = eBayes(fit2, 0.01, trend = TRUE)
-  print(head(fit2$coefficients))
-	tT = topTable(fit2, adjust = "BH", sort.by="B", number = nrow(fit2), coef = 1, confint = TRUE)
-	# tT = tT[tT$P.Value < pval_thresh, ]
+	fit2 = eBayes(fit2)
+	toptable = topTable(fit2, adjust = "BH", sort.by = "none", number = nrow(fit2), coef = 1, confint = TRUE)
 
-  #calculate the average vs all of the other cell types
-	for(i in 1:length(list_other_cells)){
-    mean_other = rowMeans(tasic_trimmed[ , which(tasic_cell_types %in% list_other_cells[[i]])])
-		if(i == 1){
-			mean_others = data.frame(mean_other)
-		} else {
-			mean_others = cbind(mean_others, mean_other)
-		}
-    str(mean_others)
-	}
-  mean_fc = rowMeans(tasic_trimmed[ , which(tasic_cell_types %in% cell_type)]) /
-      rowMeans(mean_others)
-	mean_fc_names = data.frame(row.names(tasic_trimmed), mean_fc)
-	names(mean_fc_names) = c("tasic_names", "mean_fc")
-
-	#since already sorted, need to merge via rownames
-	toptable = merge(tT, mean_fc_names, by.x = "row.names", by.y = "tasic_names")
-	# toptable = toptable[toptable$mean_fc > fc_thres, ]
-	toptable = toptable[order(toptable$t, decreasing = TRUE), ]
+  toptable$expr_average = expr_average
+  source("shrink_logFC.R")
+  toptable$fc_zscore = shrink_pval_and_avg_expr(toptable)
+  toptable$genes = rownames(toptable)
+	toptable = toptable[order(toptable$fc_zscore, decreasing = TRUE), ]
 
 	return(toptable)
 
@@ -108,10 +103,3 @@ saveRDS(tasic_ast_df, "data/dfxp/tasic_ast_df_dfxp.rds")
 saveRDS(tasic_mic_df, "data/dfxp/tasic_mic_df_dfxp.rds")
 saveRDS(tasic_end_df, "data/dfxp/tasic_end_df_dfxp.rds")
 saveRDS(tasic_opc_df, "data/dfxp/tasic_opc_df_dfxp.rds")
-
-#create a modified volcano plot
-plot(log(tasic_oli_df$mean_fc, 2), -log(tasic_oli_df$P.Value, 10))
-plot(log(tasic_neu_df$mean_fc, 2), -log(tasic_neu_df$P.Value, 10))
-plot(log(tasic_ast_df$mean_fc, 2), -log(tasic_ast_df$P.Value, 10))
-plot(log(tasic_mic_df$mean_fc, 2), -log(tasic_mic_df$P.Value, 10))
-plot(log(tasic_end_df$mean_fc, 2), -log(tasic_end_df$P.Value, 10))

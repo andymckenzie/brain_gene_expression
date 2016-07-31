@@ -2,12 +2,12 @@ library(readxl)
 library(zoo)
 library(limma)
 library(DGCA)
+library(HGNChelper)
 
-cutoff_thresh_percentile = 0.75
 
-setwd("/Users/amckenz/Documents/github/brain_gene_expression/data/")
+setwd("/Users/amckenz/Documents/github/brain_gene_expression/")
 
-cell = read_excel("TableS4-HumanMouseMasterFPKMList.xlsx", col_names = FALSE, sheet = 2)
+cell = read_excel("data/TableS4-HumanMouseMasterFPKMList.xlsx", col_names = FALSE, sheet = 2)
 
 #http://stackoverflow.com/a/7735681/560791
 #carry the last non-NA value forward
@@ -44,19 +44,23 @@ zhang_gnxp_log = log(zhang_gnxp + 1, 2)
 zhang_gnxp_log = as.data.frame(zhang_gnxp_log)
 fl = as.factor(celltypes)
 
+##########################
+#convert to cleaned human gene sybmols where possible
+source("/Users/amckenz/Documents/github/alzolig/convert_mgi_to_hgnc.R")
+gene_symbols = switchGenesToHGCN(rownames(zhang_gnxp_log))
+rownames(zhang_gnxp_log) = make.unique(gene_symbols)
+collapsed_df = collapseRows(zhang_gnxp_log, rowGroup = gene_symbols, rowID = make.unique(gene_symbols), method="MaxMean")
+zhang_gnxp_log = zhang_gnxp_log[collapsed_df$selectedRow, ]
+gene_symbols = gene_symbols[collapsed_df$selectedRow]
+rownames(zhang_gnxp_log) = gene_symbols
+
 dfxp_function <- function(cell_type, list_other_cells){
 
-	#for a given cell type that you are considering
-	#remove that gene if it has too low of expression *in that cell type*
-	#find the average of each gene in its own cell type
   if(!cell_type == "NEU"){
-    expr_average = rowMeans(zhang_gnxp_log[ , which(celltypes %in%
-  		cell_type)])
+    expr_average = rowMeans(zhang_gnxp_log[ , which(celltypes %in% cell_type)])
   } else {
     expr_average = zhang_gnxp_log[ , which(celltypes %in% cell_type)]
   }
-	cutoff = as.numeric(quantile(expr_average, cutoff_thresh_percentile, names = FALSE))
-	zhang_trimmed = zhang_gnxp_log[(expr_average > cutoff), ]
 
   celltypes_contrast = celltypes
   celltypes_contrast = gsub(cell_type, "MAIN", celltypes_contrast)
@@ -64,44 +68,18 @@ dfxp_function <- function(cell_type, list_other_cells){
     celltypes_contrast = gsub(list_other_cells[[i]], "OTHERS", celltypes_contrast)
   }
   design = makeDesign(celltypes_contrast)
-  print(design)
-	fit = lmFit(zhang_trimmed, design)
+	fit = lmFit(zhang_gnxp_log, design)
   contrast_matrix = makeContrasts(MAIN-OTHERS, levels = as.factor(celltypes_contrast))
 
 	fit2 = contrasts.fit(fit, contrast_matrix)
-  str(fit2)
-	fit2 = eBayes(fit2, 0.01, trend = TRUE)
-  print(head(fit2$coefficients))
-	tT = topTable(fit2, adjust = "BH", sort.by="B", number = nrow(fit2), coef = 1, confint = TRUE)
+	fit2 = eBayes(fit2, trend = TRUE)
+	toptable = topTable(fit2, adjust = "BH", sort.by = "none", number = nrow(fit2), coef = 1, confint = TRUE)
 
-  #calculate the average vs all of the other cell types
-	for(i in 1:length(list_other_cells)){
-    #because the neuron cell type only contains one sample
-    if(list_other_cells[[i]] == "NEU"){
-      mean_other = zhang_trimmed[ , which(celltypes %in% list_other_cells[[i]])]
-    } else {
-      mean_other = rowMeans(zhang_trimmed[ , which(celltypes %in% list_other_cells[[i]])])
-    }
-		if(i == 1){
-			mean_others = data.frame(mean_other)
-		} else {
-			mean_others = cbind(mean_others, mean_other)
-		}
-    str(mean_others)
-	}
-  if(!cell_type == "NEU"){
-    mean_fc = rowMeans(zhang_trimmed[ , which(celltypes %in% cell_type)]) /
-      rowMeans(mean_others)
-  } else {
-    mean_fc = zhang_trimmed[ , which(celltypes %in% cell_type)] /
-      rowMeans(mean_others)
-  }
-	mean_fc_names = data.frame(row.names(zhang_trimmed), mean_fc)
-	names(mean_fc_names) = c("zhang_names", "mean_fc")
-
-	#since already sorted, need to merge via rownames
-	toptable = merge(tT, mean_fc_names, by.x = "row.names", by.y = "zhang_names")
-	toptable = toptable[order(toptable$t), ]
+	toptable$expr_average = expr_average
+  source("shrink_logFC.R")
+  toptable$fc_zscore = shrink_pval_and_avg_expr(toptable)
+	toptable$genes = rownames(toptable)
+	toptable = toptable[order(toptable$fc_zscore, decreasing = TRUE), ]
 
 	return(toptable)
 
