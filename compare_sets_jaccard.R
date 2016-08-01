@@ -5,6 +5,8 @@ library(DGCA)
 library(bayesbio)
 library(corrplot)
 library(psych) #geometric.mean
+library(gridExtra) #grid.arrange
+library(gtable)
 
 cbPalette = c("#CC79A7", "#E69F00", "#56B4E9", "#000000", "#009E73", "#F0E442", "#0072B2",
  "red", "lightgreen", "#999999", "#990000")
@@ -93,10 +95,6 @@ make_volcano_facet <- function(data1){
   res_neu$cell = rep("Neuron", nrow(res_neu))
   res_ast = get(paste0(data1, "_ast_df"))
   res_ast$cell = rep("Astrocyte", nrow(res_ast))
-  str(res_oli)
-  str(res_mic)
-  str(res_neu)
-  str(res_ast)
   data_df = rbind(res_oli, res_mic, res_neu, res_ast)
 
   if(data1 != "sharma"){
@@ -111,21 +109,38 @@ make_volcano_facet <- function(data1){
     data_df = rbind(data_df, res_opc)
   }
 
-  data_df$threshold = data_df$logFC > 2 & data_df$P.Value < 0.01
+  data_df$threshold = data_df$logFC > 2 & data_df$adj.P.Val < 0.05
+
+  data1 = data_names_switch(data1)
 
   volcano = ggplot(data = data_df,
     aes(x = logFC, y = -log10(adj.P.Val), colour = threshold, facet = cell)) +
     geom_point(alpha = 0.95, size = 0.5) +
     facet_wrap( ~ cell, ncol = 2) +
     scale_colour_manual(values = c("#0072B2", "#D55E00"), guide = FALSE) +
-    xlab("Log2 Fold Change") + ylab("-Log10 P-Value") + theme_bw()
-
+    theme_bw() +
+    #xlab("Log2 Fold Change") + ylab("-Log10 P-Value")
+    ggtitle(data1) + #xlab("") + ylab("") +
+    labs(x=NULL, y=NULL) +
+    theme(text = element_text(size = 6), strip.background = element_blank()) +  #
+    theme(strip.text = element_text(size = 8 , lineheight=0.1)) +
+    theme(plot.title = element_text(size = 12))
+  # volcano <- ggplotGrob(volcano)
+  # volcano$heights[[3]] = unit(0.002, "in")
+  #
   return(volcano)
 
 }
 
-make_volcano_facet("zm16")
+z16_volcano = make_volcano_facet("z16")
+d15_volcano = make_volcano_facet("d15")
+z15_volcano = make_volcano_facet("z15")
+sharma_volcano = make_volcano_facet("sharma")
+tasic_volcano = make_volcano_facet("tasic")
+zeis_volcano = make_volcano_facet("zeis")
 
+grid.arrange(z16_volcano, d15_volcano, z15_volcano,
+  sharma_volcano, tasic_volcano, zeis_volcano, ncol = 3)
 
 compare_data_sets <- function(data1, data2, nTerms, orderByCol, orderDecr = TRUE, log_fe = TRUE){
 
@@ -192,11 +207,11 @@ compare_data_sets <- function(data1, data2, nTerms, orderByCol, orderDecr = TRUE
 data_names_switch <- function(data_names){
 
   data_names = gsub("z16", "Zhang (2016)", data_names)
-  data_names = gsub("d15", "Darmanis", data_names)
+  data_names = gsub("d15", "Darmanis (2015)", data_names)
   data_names = gsub("z15", "Zhang (2015)", data_names)
-  data_names = gsub("zeis", "Zeisel", data_names)
-  data_names = gsub("tasic", "Tasic", data_names)
-  data_names = gsub("sharma", "Sharma", data_names)
+  data_names = gsub("zeis", "Zeisel (2015)", data_names)
+  data_names = gsub("tasic", "Tasic (2016)", data_names)
+  data_names = gsub("sharma", "Sharma (2015)", data_names)
 
   return(data_names)
 
@@ -225,9 +240,10 @@ sharma_tasic = compare_data_sets(data1 = "sharma", data2 = "tasic", nTerms = ter
 zeis_tasic = compare_data_sets(data1 = "zeis", data2 = "tasic", nTerms = terms_vector, orderByCol = "fc_zscore", orderDecr = TRUE)
 
 source("/Users/amckenz/Documents/github/brain_gene_expression/multiplot.R")
-multiplot(z16_d15[[1]], z16_z15[[1]], z16_sharma[[1]], z16_zeis[[1]], z16_tasic[[1]],
-  d15_z15[[1]], d15_sharma[[1]], d15_zeis[[1]], d15_tasic[[1]],
-  z15_sharma[[1]], z15_zeis[[1]], z15_tasic[[1]], sharma_zeis[[1]], sharma_tasic[[1]], zeis_tasic[[1]], cols = 3)
+grid.arrange(z16_d15[[1]], z16_z15[[1]], z16_sharma[[1]], z16_zeis[[1]],
+  z16_tasic[[1]], d15_z15[[1]], d15_sharma[[1]], d15_zeis[[1]], d15_tasic[[1]],
+  z15_sharma[[1]], z15_zeis[[1]], z15_tasic[[1]], sharma_zeis[[1]], sharma_tasic[[1]],
+  zeis_tasic[[1]], ncol = 3)
 
 # probably just going to ignore the proteomics data for now ...
 #z16_sharmap = compare_data_sets(data1 = "z16", data2 = "sharmap", nTerms = terms_vector, orderByCol = "logFC", orderDecr = TRUE)
@@ -316,6 +332,46 @@ create_forest_plot <- function(gene, cell, subset = NULL){
 
 }
 
+find_deg_number <- function(data1){
+
+  res_oli = get(paste0(data1, "_oli_df"))
+  res_oli$cell = rep("Oligodendrocyte", nrow(res_oli))
+  n_deg_oli = sum(res_oli$logFC > 2 & res_oli$adj.P.Val < 0.05)
+  res_mic = get(paste0(data1, "_mic_df"))
+  res_mic$cell = rep("Microglia", nrow(res_mic))
+  n_deg_mic = sum(res_mic$logFC > 2 & res_mic$adj.P.Val < 0.05)
+  res_neu = get(paste0(data1, "_neu_df"))
+  res_neu$cell = rep("Neuron", nrow(res_neu))
+  n_deg_neu = sum(res_neu$logFC > 2 & res_neu$adj.P.Val < 0.05)
+  res_ast = get(paste0(data1, "_ast_df"))
+  res_ast$cell = rep("Astrocyte", nrow(res_ast))
+  n_deg_ast = sum(res_ast$logFC > 2 & res_ast$adj.P.Val < 0.05)
+  n_deg_vec = rbind(n_deg_oli, n_deg_mic, n_deg_neu, n_deg_ast)
+
+  if(data1 != "sharma"){
+    res_end = get(paste0(data1, "_end_df"))
+    res_end$cell = rep("Endothelial", nrow(res_end))
+    n_deg_end = sum(res_end$logFC > 2 & res_end$adj.P.Val < 0.05)
+    n_deg_vec = rbind(n_deg_vec, n_deg_end)
+  }
+
+  if(!data1 %in% c("z16", "zeis")){
+    res_opc = get(paste0(data1, "_opc_df"))
+    res_opc$cell = rep("OPC", nrow(res_opc))
+    n_deg_opc = sum(res_opc$logFC > 2 & res_opc$adj.P.Val < 0.05)
+    n_deg_vec = rbind(n_deg_vec, n_deg_opc)
+  }
+
+  return(n_deg_vec)
+
+}
+
+std_error <- function(x) sd(x)/sqrt(length(x))
+full_deg_res = as.numeric(find_deg_number("z16"), find_deg_number("d15"), find_deg_number("z15"),
+  find_deg_number("zeis"), find_deg_number("tasic"), find_deg_number("sharma"))
+mean(full_deg_res)
+std_error(full_deg_res)
+
 #this function ranks the genes across multiple data sets
 rank_genes_logfc <- function(cell, subset = NULL, mouse_vs_human = FALSE, orderDown = TRUE){
 
@@ -355,7 +411,7 @@ rank_genes_logfc <- function(cell, subset = NULL, mouse_vs_human = FALSE, orderD
   #filter to remove genes that are present in too few of the data sets
   log_fc_only_merged = merged[ , grepl("fc_zscore", colnames(merged))]
   merged$n_data_na = apply(log_fc_only_merged, 1, function(x) sum(is.na(x)))
-  merged = merged[!merged$n_data_na >= n_data_sets * 0.5, ]
+  merged = merged[!merged$n_data_na >= 0.1, ]
   #if merging mice and human, require at least one of each
   if(is.null(subset)){
     log_fc_only_merged = merged[ , grepl("fc_zscore", colnames(merged))]
@@ -374,25 +430,28 @@ rank_genes_logfc <- function(cell, subset = NULL, mouse_vs_human = FALSE, orderD
   #mouse vs human difference
   if(mouse_vs_human){
     log_fc_merged = merged[ , grepl("fc_zscore", colnames(merged))]
+    fc_res = vector(mode = "numeric", length = nrow(log_fc_merged))
     t_res = vector(mode = "numeric", length = nrow(log_fc_merged))
+    p_vals = vector(mode = "numeric", length = nrow(log_fc_merged))
     for(i in 1:nrow(log_fc_merged)){
-      print(i)
       str(as.numeric(log_fc_merged[i, data_sets %in% c("z16", "d15")]))
       str(as.numeric(log_fc_merged[i, data_sets %in% c("z15", "sharma", "zeis", "tasic")]))
-      str(mean(as.numeric(log_fc_merged[i, data_sets %in% c("z16", "d15")]), na.rm = TRUE))
-      str(mean(as.numeric(log_fc_merged[i, data_sets %in% c("z15", "sharma", "zeis", "tasic")]), na.rm = TRUE))
-      t_res[i] = mean(as.numeric(log_fc_merged[i, data_sets %in% c("z16", "d15")]), na.rm = TRUE) -
+      fc_res[i] = mean(as.numeric(log_fc_merged[i, data_sets %in% c("z16", "d15")]), na.rm = TRUE) -
         mean(as.numeric(log_fc_merged[i, data_sets %in% c("z15", "sharma", "zeis", "tasic")]), na.rm = TRUE)
-      # t_res[i] = t.test(as.numeric(
-      #   log_fc_merged[i, data_sets %in% c("z16", "d15")]),
-      #   as.numeric(log_fc_merged[i, data_sets %in% c("z15", "sharma", "zeis", "tasic")]))$statistic
+      t_res[i] = t.test(as.numeric(log_fc_merged[i, data_sets %in% c("z16", "d15")]),
+        as.numeric(log_fc_merged[i, data_sets %in% c("z15", "sharma", "zeis", "tasic")]), na.rm = TRUE)$statistic
+      p_vals[i] = t.test(as.numeric(log_fc_merged[i, data_sets %in% c("z16", "d15")]),
+        as.numeric(log_fc_merged[i, data_sets %in% c("z15", "sharma", "zeis", "tasic")]), na.rm = TRUE)$p.value
     }
-    log_fc_merged$mouse_vs_human_res = t_res
+    log_fc_merged$mouse_vs_human_fc_res = fc_res
+    log_fc_merged$mouse_vs_human_t_res = t_res
+    log_fc_merged$mouse_vs_human_p_vals = p_vals
+    log_fc_merged$mouse_vs_human_p_val_adj = qvalue(p_vals)$qvalue
     log_fc_merged$gene = merged$genes
     # log_fc_merged$mouse_vs_human_res =
     #   mean(as.numeric(log_fc_merged[, data_sets %in% c("z16", "d15")])) -
     #   mean(as.numeric(log_fc_merged[, data_sets %in% c("z15", "sharma", "zeis", "tasic")]))
-    log_fc_merged = log_fc_merged[order(log_fc_merged$mouse_vs_human_res, decreasing = orderDown), ]
+    log_fc_merged = log_fc_merged[order(log_fc_merged$mouse_vs_human_p_vals, decreasing = orderDown), ]
     return(log_fc_merged)
   } else {
     return(log_fc_merged)
