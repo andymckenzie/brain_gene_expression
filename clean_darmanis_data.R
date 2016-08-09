@@ -3,6 +3,9 @@ library(edgeR)
 library(DGCA)
 library(limma)
 library(HGNChelper)
+library(locfit)
+library(statmod)
+
 
 
 ############################

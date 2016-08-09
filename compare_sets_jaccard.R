@@ -95,7 +95,7 @@ make_volcano_facet <- function(data1){
   res_neu$cell = rep("Neuron", nrow(res_neu))
   res_ast = get(paste0(data1, "_ast_df"))
   res_ast$cell = rep("Astrocyte", nrow(res_ast))
-  data_df = rbind(res_oli, res_mic, res_neu, res_ast)
+  data_df = (res_oli, res_mic, res_neu, res_ast)
 
   if(data1 != "sharma"){
     res_end = get(paste0(data1, "_end_df"))
@@ -184,6 +184,8 @@ compare_data_sets <- function(data1, data2, nTerms, orderByCol, orderDecr = TRUE
 
   if(log_fe){ fe_df$fe = log(fe_df$fe , 2) }
 
+  print(fe_df)
+
   fe_layers_plot = ggplot(data = fe_df, aes(x = nTerms, y = fe,
 	    group = cell, colour = cell)) + geom_line() + geom_point() +
     theme_bw() +
@@ -238,6 +240,10 @@ sharma_zeis = compare_data_sets(data1 = "sharma", data2 = "zeis", nTerms = terms
 sharma_tasic = compare_data_sets(data1 = "sharma", data2 = "tasic", nTerms = terms_vector, orderByCol = "fc_zscore", orderDecr = TRUE)
 
 zeis_tasic = compare_data_sets(data1 = "zeis", data2 = "tasic", nTerms = terms_vector, orderByCol = "fc_zscore", orderDecr = TRUE)
+
+# > zeis_end_df_match = zeis_end_df[zeis_end_df$genes %in% tasic_end_df$genes, ]
+# > tasic_end_df_match = tasic_end_df[tasic_end_df$genes %in% zeis_end_df$genes, ]
+# > intersect(head(zeis_end_df, 10)$genes, head(tasic_end_df, 10)$genes )
 
 source("/Users/amckenz/Documents/github/brain_gene_expression/multiplot.R")
 grid.arrange(z16_d15[[1]], z16_z15[[1]], z16_sharma[[1]], z16_zeis[[1]],
@@ -319,18 +325,64 @@ fe_data_opc = fe_data_opc[!rownames(fe_data_opc) %in% c("z16", "zeis"), !colname
 fe_data_opc[lower.tri(fe_data_opc)] = t(fe_data_opc)[lower.tri(fe_data_opc)]
 corrplot.mixed(fe_data_opc, lower = "number", upper = "circle", tl.pos = "lt", addgrid.col = "black", is.corr = FALSE)
 
-create_forest_plot <- function(gene, cell, subset = NULL){
+get_forest_plot <- function(gene, cell, auto_min = FALSE){
 
-  drops = NULL
+  d15_res = get(paste0("d15_", cell, "_df"))
+  d15_res$study = rep("Darmanis (2015)", nrow(d15_res))
+  d15_res$type = rep("Human", nrow(d15_res))
+  z15_res = get(paste0("z15_", cell, "_df"))
+  z15_res$study = rep("Zhang (2015)", nrow(z15_res))
+  z15_res$type = rep("Mouse", nrow(z15_res))
+  tasic_res = get(paste0("tasic_", cell, "_df"))
+  tasic_res$study = rep("Tasic (2016)", nrow(tasic_res))
+  tasic_res$type = rep("Mouse", nrow(tasic_res))
+  cell_df = rbind(d15_res, z15_res, tasic_res)
 
-  if(cell == "opc"){
-    drops = c(drops, "z16", "zeis")
+  if(cell != "opc"){
+    zeis_res = get(paste0("zeis_", cell, "_df"))
+    zeis_res$study = rep("Zeisel (2015)", nrow(zeis_res))
+    zeis_res$type = rep("Mouse", nrow(zeis_res))
+    z16_res = get(paste0("z16_", cell, "_df"))
+    z16_res$study = rep("Zhang (2016)", nrow(z16_res))
+    z16_res$type = rep("Human", nrow(z16_res))
+    cell_df = rbind(cell_df, zeis_res, z16_res)
   }
-  if(cell == "end"){
-    drops = c(drops, "sharma")
+
+  if(cell != "end"){
+    sharma_res = get(paste0("sharma_", cell, "_df"))
+    sharma_res$study = rep("Sharma (2015)", nrow(sharma_res))
+    sharma_res$type = rep("Mouse", nrow(sharma_res))
+    cell_df = rbind(cell_df, sharma_res)
   }
+
+  cell_df = cell_df[cell_df$genes %in% gene, ]
+
+  print(cell_df)
+
+  forest_plot = ggplot(cell_df, aes(x = logFC, y = study, xmin = CI.L, xmax = CI.R, color = type)) +
+    geom_vline(xintercept = 0.0, linetype = 2, alpha = 0.75) +
+    geom_errorbarh(alpha = 0.5, height = 0) +
+    geom_point(shape = 15) +
+    theme_bw() + ggtitle(paste0(gene, " in ", toupper(cell))) + ylab(NULL) + xlab("log2 Fold-Change") +
+    theme(legend.position="none") +
+    theme(text = element_text(size = 8)) +  #
+    theme(plot.title = element_text(size = 12))
+
+  if(auto_min) { forest_plot = forest_plot + xlim(min(0, cell_df$CI.L), max(cell_df$CI.R)) }
+  if(!auto_min) { forest_plot = forest_plot + xlim(-1.75, 17.5) }
+
+
+  return(forest_plot)
 
 }
+
+plp1 = get_forest_plot("PLP1", "oli")
+snap25 = get_forest_plot("SNAP25", "neu")
+ctss = get_forest_plot("CTSS", "mic")
+itm2a = get_forest_plot("ITM2A", "end")
+gja1 = get_forest_plot("GJA1", "ast")
+pdgfra = get_forest_plot("PDGFRA", "opc")
+grid.arrange(plp1, snap25, gja1, ctss, itm2a, pdgfra, ncol = 2)
 
 find_deg_number <- function(data1){
 
@@ -372,6 +424,85 @@ full_deg_res = as.numeric(find_deg_number("z16"), find_deg_number("d15"), find_d
 mean(full_deg_res)
 std_error(full_deg_res)
 
+plot_set <- function(cell, nGenes){
+
+  d15_res = get(paste0("d15_", cell, "_df"))
+  z15_res = get(paste0("z15_", cell, "_df"))
+  tasic_res = get(paste0("tasic_", cell, "_df"))
+  gene_sets = list(d15_res$genes, z15_res$genes, tasic_res$genes)
+
+  if(cell != "opc"){
+    zeis_res = get(paste0("zeis_", cell, "_df"))
+    z16_res = get(paste0("z16_", cell, "_df"))
+    gene_sets$a = z16_res$genes
+    gene_sets$b = zeis_res$genes
+  }
+
+  if(cell != "end"){
+    sharma_res = get(paste0("sharma_", cell, "_df"))
+    gene_sets$c = sharma_res$genes
+  }
+
+  universe = Reduce(intersect, gene_sets)
+  universe = unique(universe)
+
+  d15_res = d15_res[d15_res$genes %in% universe, ]
+  z15_res = z15_res[z15_res$genes %in% universe, ]
+  tasic_res = tasic_res[tasic_res$genes %in% universe, ]
+
+  gene_sets = list(
+    head(d15_res$genes, nGenes),
+    head(z15_res$genes, nGenes),
+    head(tasic_res$genes, nGenes))
+
+  data_sets = c("d15", "z15", "tasic")
+
+  if(cell != "opc"){
+    zeis_res = zeis_res[zeis_res$genes %in% universe, ]
+    z16_res = z16_res[z16_res$genes %in% universe, ]
+    gene_sets$a = head(z16_res$genes, nGenes)
+    gene_sets$b = head(zeis_res$genes, nGenes)
+    data_sets = c(data_sets, "z16", "zeis")
+  }
+
+  if(cell != "end"){
+    sharma_res = sharma_res[sharma_res$genes %in% universe, ]
+    gene_sets$c = head(sharma_res$genes, nGenes)
+    data_sets = c(data_sets, "sharma")
+  }
+
+  data_names = data_names_switch(data_sets)
+  str(data_names)
+  names(gene_sets) = data_names
+  str(gene_sets)
+
+  cell_res = supertest(gene_sets, n = length(universe))
+  cell_res$P.value = p.adjust(cell_res$P.value, method = "BH")
+
+  cellres_df = summary(cell_res)$Table
+  cellres_df = cellres_df[!cellres_df$Degree == 1,]
+  cellres_df = cellres_df[ , !colnames(cellres_df) %in% "Elements"]
+  # cellres_df$adj_pval = p.adjust(cellres_df$P.value, method = "BH")
+
+  # print(cellres_df)
+  print(cellres_df[cellres_df$Intersections == "Darmanis (2015) & Zhang (2016)", ])
+  print(cellres_df[cellres_df$Intersections == "Zhang (2015) & Tasic (2016) & Zeisel (2015) & Sharma (2015)", ])
+  print(cellres_df[cellres_df$Intersections == "Darmanis (2015) & Zhang (2015) & Tasic (2016)", ])
+
+  plot(cell_res, sort.by = 'size', degree = 2:length(gene_sets),
+    keep.empty.intersections = FALSE, cex = 1, legend.pos=c(2,2)) #circular
+
+
+}
+
+plot_set("oli", 200)
+plot_set("neu", 200)
+plot_set("mic", 200)
+plot_set("ast", 200)
+plot_set("end", 200)
+plot_set("opc", 200)
+
+
 #this function ranks the genes across multiple data sets
 rank_genes_logfc <- function(cell, subset = NULL, mouse_vs_human = FALSE, orderDown = TRUE){
 
@@ -411,7 +542,7 @@ rank_genes_logfc <- function(cell, subset = NULL, mouse_vs_human = FALSE, orderD
   #filter to remove genes that are present in too few of the data sets
   log_fc_only_merged = merged[ , grepl("fc_zscore", colnames(merged))]
   merged$n_data_na = apply(log_fc_only_merged, 1, function(x) sum(is.na(x)))
-  merged = merged[!merged$n_data_na >= 0.1, ]
+  merged = merged[!merged$n_data_na >= 0.5, ]
   #if merging mice and human, require at least one of each
   if(is.null(subset)){
     log_fc_only_merged = merged[ , grepl("fc_zscore", colnames(merged))]
@@ -459,22 +590,30 @@ rank_genes_logfc <- function(cell, subset = NULL, mouse_vs_human = FALSE, orderD
 
 }
 
-oli_mouse_vs_human = rank_genes_logfc("oli", mouse_vs_human = TRUE, orderDown = TRUE)
-neu_human_vs_mouse = rank_genes_logfc("neu", mouse_vs_human = TRUE, orderDown = FALSE)
-
-oli_top_human = rank_genes_logfc("oli", subset = "human")
 neu_top = rank_genes_logfc("neu")
 mic_top = rank_genes_logfc("mic")
 ast_top = rank_genes_logfc("ast")
 end_top = rank_genes_logfc("end")
 opc_top = rank_genes_logfc("opc")
+oli_top = rank_genes_logfc("oli")
 
-oli_top_combo
+write.delim(neu_top, "neu_top_all.tsv")
+write.delim(mic_top, "mic_top_all.tsv")
+write.delim(ast_top, "ast_top_all.tsv")
+write.delim(end_top, "end_top_all.tsv")
+write.delim(opc_top, "opc_top_all.tsv")
+write.delim(oli_top, "oli_top_all.tsv")
 
-oli_top_mouse
+oli_top_human = rank_genes_logfc("oli", subset = "human")
+neu_top_human = rank_genes_logfc("neu", subset = "human")
+ast_top_human = rank_genes_logfc("ast", subset = "human")
+mic_top_human = rank_genes_logfc("mic", subset = "human")
+end_top_human = rank_genes_logfc("end", subset = "human")
+opc_top_human = rank_genes_logfc("opc", subset = "human")
 
-oli_human_vs_mouse_difference =
-
-oli_mouse_vs_human_difference =
-
-#identify the genes with the largest difference in brain cell-type specific expression between mice and humans?
+write.delim(oli_top_human, "oli_top_human.tsv")
+write.delim(neu_top_human, "neu_top_human.tsv")
+write.delim(ast_top_human, "ast_top_human.tsv")
+write.delim(mic_top_human, "mic_top_human.tsv")
+write.delim(end_top_human, "end_top_human.tsv")
+write.delim(opc_top_human, "opc_top_human.tsv")

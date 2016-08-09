@@ -2,7 +2,8 @@ library(edgeR)
 library(DGCA)
 library(limma)
 library(HGNChelper)
-
+library(locfit)
+library(statmod)
 
 setwd("/Users/amckenz/Documents/github/brain_gene_expression/")
 
@@ -71,20 +72,18 @@ dfxp_function <- function(cell_type, list_other_cells){
     celltypes_contrast = gsub(list_other_cells[[i]], "OTHERS", celltypes_contrast)
   }
   design = makeDesign(celltypes_contrast)
+  #look into adding covariates ...
 
-  tasic_voom_res = voom(tasic_counts, design, plot = TRUE)
-	fit = lmFit(tasic_voom_res, design)
+  #https://support.bioconductor.org/p/79149/
+  str(tasic_counts)
+  disp = estimateDisp(tasic_counts, design, robust = TRUE)
+  str(disp)
+	fit = glmFit(tasic_counts, design = design, dispersion = disp)
+  str(fit)
   contrast_matrix = makeContrasts(MAIN-OTHERS, levels = as.factor(celltypes_contrast))
 
-	fit2 = contrasts.fit(fit, contrast_matrix)
-	fit2 = eBayes(fit2)
-	toptable = topTable(fit2, adjust = "BH", sort.by = "none", number = nrow(fit2), coef = 1, confint = TRUE)
-
-  toptable$expr_average = expr_average
-  source("shrink_logFC.R")
-  toptable$fc_zscore = shrink_pval_and_avg_expr(toptable)
-  toptable$genes = rownames(toptable)
-	toptable = toptable[order(toptable$fc_zscore, decreasing = TRUE), ]
+	fit2 = glmLRT(fit, contrast_matrix)
+	toptable = topTags(fit2, adjust.method = "BH", sort.by = "none", n = nrow(fit2))
 
 	return(toptable)
 
